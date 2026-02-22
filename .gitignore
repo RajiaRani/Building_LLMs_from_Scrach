@@ -1,0 +1,52 @@
+# ============================
+# Python
+# ============================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.DS_Store
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# ============================
+# Jupyter
+# ============================
+.ipynb_checkpoints/
+
+# ============================
+# Large model weights
+# ============================
+*.ckpt
+*.ckpt.*
+*.bin
+*.pt
+*.pth
+*.h5
+*.npz
+
+# GPT-2 downloaded files
+gpt2/
+models/
+06. Loading_The_GPT2_Weights/gpt2/
+
+# ============================
+# Large datasets
+# ============================
+*.csv
+*.tsv
+*.txt
+*.jsonl
+
+# ============================
+# Logs
+# ============================
+*.log
+
+# ============================
+# Mac system files
+# ============================
+.DS_Store
