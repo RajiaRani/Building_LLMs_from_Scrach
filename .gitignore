@@ -50,3 +50,6 @@ models/
 # Mac system files
 # ============================
 .DS_Store
+
+*.txt
+01.Tokenizer/the_verdict.txt
