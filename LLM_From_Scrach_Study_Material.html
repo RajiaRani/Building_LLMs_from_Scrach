@@ -1,0 +1,2694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformers From Scratch — An Interactive Course</title>
+<style>
+/* ============================================================
+   THEME — "Ink Notebook": deep charcoal-blue, amber + teal ink
+   No external fonts/libs. System stacks only. Runs offline.
+   ============================================================ */
+:root{
+  --bg:#0c0e14;
+  --bg2:#11141d;
+  --panel:#161a26;
+  --panel2:#1c2130;
+  --line:#262d40;
+  --line2:#323b54;
+  --ink:#e7e3d8;            /* warm paper-ink text */
+  --ink-dim:#a7a899;
+  --ink-faint:#6f7382;
+  --amber:#f2a65a;          /* primary accent */
+  --amber-soft:#f7c489;
+  --teal:#5eead4;           /* secondary accent */
+  --teal-dim:#2f8f81;
+  --violet:#9aa6ff;         /* used sparingly for K vectors etc */
+  --rose:#ff6b81;           /* masks / warnings */
+  --green:#7ee787;
+  --grid:#1a1f2e;
+  --serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif;
+  --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, 'Liberation Mono', monospace;
+  --shadow: 0 18px 50px -20px rgba(0,0,0,.8);
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  font-family:var(--serif);
+  background:
+    radial-gradient(900px 600px at 85% -5%, rgba(242,166,90,.06), transparent 60%),
+    radial-gradient(700px 500px at -5% 10%, rgba(94,234,212,.05), transparent 55%),
+    var(--bg);
+  color:var(--ink);
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+/* faint grain/texture */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.035;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+a{color:var(--teal);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ---------- Layout ---------- */
+#app{display:flex;min-height:100vh;position:relative;z-index:1}
+#sidebar{
+  width:300px;flex:0 0 300px;position:sticky;top:0;align-self:flex-start;
+  height:100vh;overflow-y:auto;background:linear-gradient(180deg,var(--bg2),var(--bg));
+  border-right:1px solid var(--line);padding:22px 16px 60px;
+}
+#sidebar .brand{font-family:var(--sans);font-weight:800;letter-spacing:.5px;font-size:18px;color:var(--ink);margin:4px 6px 2px}
+#sidebar .brand span{color:var(--amber)}
+#sidebar .sub{font-family:var(--mono);font-size:11px;color:var(--ink-faint);margin:0 6px 16px;letter-spacing:.4px}
+.progress-wrap{margin:0 6px 18px}
+.progress-track{height:7px;background:var(--panel2);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.progress-fill{height:100%;width:0;background:linear-gradient(90deg,var(--teal),var(--amber));transition:width .5s ease}
+.progress-label{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-top:6px;display:flex;justify-content:space-between}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:9px;cursor:pointer;
+  font-family:var(--sans);font-size:13.5px;color:var(--ink-dim);margin:2px 0;border:1px solid transparent;
+  transition:all .15s;user-select:none;
+}
+.nav-item:hover{background:var(--panel);color:var(--ink)}
+.nav-item.active{background:linear-gradient(90deg,rgba(242,166,90,.16),rgba(242,166,90,.02));color:var(--amber-soft);border-color:rgba(242,166,90,.25)}
+.nav-item .num{font-family:var(--mono);font-size:11px;color:var(--ink-faint);min-width:22px}
+.nav-item.active .num{color:var(--amber)}
+.nav-item .check{margin-left:auto;font-size:12px;color:var(--green);opacity:0;transition:opacity .2s}
+.nav-item.done .check{opacity:1}
+.nav-sec{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-faint);margin:18px 12px 6px}
+
+/* ---------- Main ---------- */
+#main{flex:1;min-width:0;max-width:980px;margin:0 auto;padding:46px 48px 140px}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--amber)}
+h1.module-title{font-family:var(--sans);font-weight:800;font-size:40px;line-height:1.1;margin:6px 0 4px;letter-spacing:-.5px}
+.module-tag{font-family:var(--mono);font-size:12px;color:var(--ink-faint)}
+.lead{font-size:18.5px;color:var(--ink-dim);margin:14px 0 30px;max-width:70ch}
+
+h2.step{
+  font-family:var(--sans);font-weight:700;font-size:22px;margin:42px 0 14px;
+  display:flex;align-items:center;gap:12px;letter-spacing:-.2px;
+}
+h2.step .badge{
+  font-family:var(--mono);font-size:11px;font-weight:700;color:var(--bg);
+  background:var(--teal);padding:3px 9px;border-radius:99px;letter-spacing:.5px;flex:0 0 auto;
+}
+h2.step.intuition .badge{background:var(--teal)}
+h2.step.visual .badge{background:var(--amber)}
+h2.step.math .badge{background:var(--violet)}
+h2.step.dims .badge{background:#7dd3fc}
+h2.step.numeric .badge{background:var(--green)}
+h2.step.code .badge{background:#c0a4ff}
+h2.step.quiz .badge{background:#ffd166}
+h2.step.mistakes .badge{background:var(--rose)}
+h3{font-family:var(--sans);font-weight:700;font-size:17px;margin:26px 0 8px;color:var(--ink)}
+p{margin:12px 0;max-width:72ch}
+.note{font-family:var(--sans);font-size:14.5px;color:var(--ink-dim)}
+ul,ol{max-width:72ch;padding-left:22px}
+li{margin:6px 0}
+strong{color:var(--amber-soft);font-weight:700}
+em.key{font-style:normal;color:var(--teal);font-weight:600}
+
+/* cards / callouts */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin:18px 0;box-shadow:var(--shadow)}
+.callout{border-left:3px solid var(--teal);background:linear-gradient(90deg,rgba(94,234,212,.07),transparent);padding:14px 18px;border-radius:0 10px 10px 0;margin:18px 0;font-size:15px}
+.callout.warn{border-color:var(--rose);background:linear-gradient(90deg,rgba(255,107,129,.08),transparent)}
+.callout.idea{border-color:var(--amber)}
+.callout .h{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--teal);display:block;margin-bottom:4px}
+.callout.warn .h{color:var(--rose)}
+.callout.idea .h{color:var(--amber)}
+
+/* math */
+.eq{font-family:var(--mono);background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0;font-size:16px;color:var(--ink);overflow-x:auto;white-space:nowrap}
+.eq .op{color:var(--amber)}
+.eq .v{color:var(--teal)}
+.eq .small{color:var(--ink-faint);font-size:13px}
+.frac{display:inline-flex;flex-direction:column;text-align:center;vertical-align:middle;margin:0 4px}
+.frac .top{border-bottom:1.5px solid var(--ink-dim);padding:0 6px}
+.frac .bot{padding:0 6px}
+sub,sup{font-size:.72em}
+
+/* tables */
+table{border-collapse:collapse;width:100%;margin:16px 0;font-family:var(--mono);font-size:13px}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left}
+th{background:var(--panel2);color:var(--amber-soft);font-weight:700;letter-spacing:.3px}
+td{color:var(--ink-dim)}
+tr:nth-child(even) td{background:rgba(255,255,255,.012)}
+
+/* code blocks */
+.code-block{background:#0a0c12;border:1px solid var(--line);border-radius:12px;margin:16px 0;overflow:hidden}
+.code-head{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--panel2);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--ink-dim)}
+.code-head .dot{width:11px;height:11px;border-radius:50%}
+.code-head .fname{margin-left:6px;color:var(--ink-faint)}
+.code-head .toggle{margin-left:auto;cursor:pointer;color:var(--amber);font-size:11px;border:1px solid var(--line2);padding:3px 9px;border-radius:6px;user-select:none}
+.code-head .toggle:hover{background:var(--panel)}
+pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.7;tab-size:4}
+pre.collapsed{display:none}
+code{font-family:var(--mono)}
+/* python syntax colors */
+.tok-kw{color:#ff9d7a}.tok-def{color:#7dd3fc}.tok-str{color:#9fe88d}.tok-num{color:#f2c879}
+.tok-com{color:#566080;font-style:italic}.tok-fn{color:#c0a4ff}.tok-self{color:#f08eb0}
+.tok-op{color:var(--ink-dim)}.tok-builtin{color:#5eead4}
+.line-note{color:var(--ink-faint);font-style:italic}
+.explain-row{display:grid;grid-template-columns:1fr;gap:6px;margin:10px 0}
+.explain-row .ln{font-family:var(--mono);font-size:12.5px;background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--teal);padding:8px 12px;border-radius:0 8px 8px 0}
+.explain-row .ln b{color:var(--amber-soft)}
+
+/* generic interactive controls */
+.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin:14px 0}
+.control{display:flex;flex-direction:column;gap:5px;font-family:var(--mono);font-size:11.5px;color:var(--ink-faint)}
+.control label{letter-spacing:.4px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:160px;height:5px;border-radius:99px;background:var(--line2);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--amber);cursor:pointer;border:2px solid var(--bg)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--amber);cursor:pointer;border:2px solid var(--bg)}
+.control .val{color:var(--teal);font-size:13px}
+.btn{font-family:var(--sans);font-weight:600;font-size:13.5px;background:var(--amber);color:#1a1206;border:none;padding:9px 18px;border-radius:9px;cursor:pointer;transition:transform .1s,filter .15s}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;border:1px solid var(--line2);color:var(--ink)}
+.btn.ghost:hover{background:var(--panel)}
+.btn.teal{background:var(--teal);color:#06231f}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+
+/* matrix display */
+.matrix-stage{display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:center;margin:18px 0}
+.mat{display:inline-block;text-align:center}
+.mat .label{font-family:var(--mono);font-size:12px;color:var(--amber-soft);margin-bottom:6px}
+.mat .label .shape{color:var(--ink-faint)}
+.grid-mat{display:inline-grid;gap:3px;background:var(--line);padding:3px;border-radius:8px}
+.cell{font-family:var(--mono);font-size:11px;width:42px;height:30px;display:flex;align-items:center;justify-content:center;background:var(--panel2);border-radius:4px;color:var(--ink);transition:background .25s,color .25s,transform .15s}
+.cell.hl{background:var(--amber);color:#1a1206;transform:scale(1.08)}
+.cell.hlk{background:var(--violet);color:#10122a}
+.cell.hlv{background:var(--teal);color:#06231f}
+.mat-op{font-family:var(--mono);font-size:26px;color:var(--ink-faint)}
+
+/* canvases */
+canvas{max-width:100%;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:block}
+.canvas-wrap{margin:16px 0}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);margin:8px 0}
+.legend .sw{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+/* quiz */
+.quiz{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:6px 22px 18px;margin:18px 0}
+.q{padding:16px 0;border-bottom:1px solid var(--line)}
+.q:last-child{border-bottom:none}
+.q .qtext{font-family:var(--sans);font-weight:600;font-size:15.5px;margin-bottom:10px}
+.q .qtext .qn{color:var(--amber);font-family:var(--mono);margin-right:8px}
+.opt{display:block;font-family:var(--sans);font-size:14.5px;padding:10px 14px;border:1px solid var(--line2);border-radius:9px;margin:7px 0;cursor:pointer;transition:all .15s;color:var(--ink-dim)}
+.opt:hover{border-color:var(--amber);color:var(--ink)}
+.opt.correct{background:rgba(126,231,135,.13);border-color:var(--green);color:#cdeccf}
+.opt.wrong{background:rgba(255,107,129,.12);border-color:var(--rose);color:#f3c9d0}
+.opt.chosen{border-width:2px}
+.explain{font-family:var(--sans);font-size:13.5px;color:var(--ink-dim);margin-top:10px;padding:10px 14px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--teal);display:none}
+.explain.show{display:block}
+
+/* clickable block diagram */
+.block-comp{cursor:pointer;transition:all .2s}
+.block-comp:hover{filter:brightness(1.25)}
+.block-detail{font-family:var(--sans);font-size:14.5px;color:var(--ink-dim);background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-top:14px;min-height:40px}
+.block-detail b{color:var(--amber-soft)}
+
+/* shape pills */
+.shape-pill{display:inline-block;font-family:var(--mono);font-size:12px;background:var(--panel2);border:1px solid var(--line2);border-radius:7px;padding:3px 9px;color:var(--teal);margin:3px 4px}
+.shape-flow{display:flex;flex-direction:column;gap:8px;margin:16px 0}
+.shape-flow .row{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:12.5px;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:10px 14px}
+.shape-flow .row .stage{color:var(--amber-soft);min-width:230px}
+.shape-flow .row .arrow{color:var(--ink-faint)}
+.shape-flow .row .shape{color:var(--teal)}
+
+/* footer nav */
+.module-nav{display:flex;justify-content:space-between;margin-top:60px;padding-top:24px;border-top:1px solid var(--line);gap:14px}
+.module-nav .btn{flex:0 0 auto}
+.mark-done{display:flex;align-items:center;gap:10px;justify-content:center;margin-top:40px}
+
+/* roadmap */
+.roadmap{display:flex;flex-direction:column;gap:0;margin:24px 0}
+.stage{display:flex;gap:18px;position:relative;padding:0 0 26px 0}
+.stage .bullet{flex:0 0 auto;width:44px;height:44px;border-radius:50%;background:var(--panel2);border:2px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;color:var(--amber);z-index:2;transition:all .4s}
+.stage.lit .bullet{background:var(--amber);color:#1a1206;border-color:var(--amber);box-shadow:0 0 0 6px rgba(242,166,90,.14)}
+.stage .stem{position:absolute;left:21px;top:44px;bottom:0;width:2px;background:var(--line2)}
+.stage.lit .stem{background:linear-gradient(180deg,var(--amber),var(--line2))}
+.stage:last-child .stem{display:none}
+.stage .body{flex:1;padding-top:6px}
+.stage .body h4{font-family:var(--sans);margin:0 0 4px;font-size:16.5px;color:var(--ink)}
+.stage .body p{margin:2px 0;font-size:14px;color:var(--ink-dim)}
+
+.tag-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:16px 0}
+.tag-card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px;transition:all .2s;cursor:default}
+.tag-card:hover{border-color:var(--amber);transform:translateY(-2px)}
+.tag-card .t{font-family:var(--mono);font-size:13px;color:var(--amber-soft);font-weight:700}
+.tag-card .d{font-size:12.5px;color:var(--ink-dim);margin-top:4px;line-height:1.5}
+
+.mobile-toggle{display:none}
+@media(max-width:880px){
+  #sidebar{position:fixed;left:-310px;z-index:50;transition:left .25s;box-shadow:var(--shadow)}
+  #sidebar.open{left:0}
+  #main{padding:70px 22px 120px}
+  h1.module-title{font-size:30px}
+  .mobile-toggle{display:flex;position:fixed;top:14px;left:14px;z-index:60;background:var(--amber);color:#1a1206;border:none;width:42px;height:42px;border-radius:10px;font-size:20px;cursor:pointer;align-items:center;justify-content:center}
+}
+.hl-pulse{animation:pulse 1.4s ease}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(242,166,90,.5)}100%{box-shadow:0 0 0 18px rgba(242,166,90,0)}}
+.fade-in{animation:fade .4s ease}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<button class="mobile-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">Transformers <span>From Scratch</span></div>
+    <div class="sub">interactive course · build GPT in PyTorch</div>
+    <div class="progress-wrap">
+      <div class="progress-track"><div class="progress-fill" id="progFill"></div></div>
+      <div class="progress-label"><span id="progText">0 / 18 complete</span><span id="progPct">0%</span></div>
+    </div>
+    <nav id="nav"></nav>
+  </aside>
+  <main id="main">
+    <div id="content"></div>
+    <div class="module-nav">
+      <button class="btn ghost" id="prevBtn">← Previous</button>
+      <button class="btn" id="nextBtn">Next →</button>
+    </div>
+  </main>
+</div>
+<script>
+/* ================= CORE FRAMEWORK ================= */
+const MODULES = []; // populated by module scripts below
+let current = 0;
+const State = {
+  done: new Set(),
+  load(){ try{const d=JSON.parse(localStorage.getItem('tfx_done')||'[]');d.forEach(x=>this.done.add(x));}catch(e){} },
+  save(){ try{localStorage.setItem('tfx_done',JSON.stringify([...this.done]));}catch(e){} }
+};
+State.load();
+
+function buildNav(){
+  const nav=document.getElementById('nav');
+  let html='';
+  let lastSec=null;
+  MODULES.forEach((m,i)=>{
+    if(m.section!==lastSec){html+=`<div class="nav-sec">${m.section}</div>`;lastSec=m.section;}
+    html+=`<div class="nav-item" data-i="${i}">
+      <span class="num">${m.num}</span><span>${m.title}</span><span class="check">✓</span></div>`;
+  });
+  nav.innerHTML=html;
+  nav.querySelectorAll('.nav-item').forEach(el=>{
+    el.addEventListener('click',()=>go(parseInt(el.dataset.i)));
+  });
+  refreshNav();
+}
+function refreshNav(){
+  document.querySelectorAll('.nav-item').forEach(el=>{
+    const i=parseInt(el.dataset.i);
+    el.classList.toggle('active',i===current);
+    el.classList.toggle('done',State.done.has(MODULES[i].id));
+  });
+  const total=MODULES.length;
+  const pct=Math.round(State.done.size/total*100);
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progText').textContent=`${State.done.size} / ${total} complete`;
+  document.getElementById('progPct').textContent=pct+'%';
+}
+function go(i){
+  if(i<0||i>=MODULES.length)return;
+  current=i;
+  const c=document.getElementById('content');
+  c.innerHTML=MODULES[i].render();
+  c.classList.remove('fade-in');void c.offsetWidth;c.classList.add('fade-in');
+  if(MODULES[i].init)try{MODULES[i].init();}catch(e){console.error('init error',e);}
+  highlightAll();
+  refreshNav();
+  document.getElementById('prevBtn').style.visibility=i===0?'hidden':'visible';
+  document.getElementById('nextBtn').textContent=i===MODULES.length-1?'Finish ✓':'Next →';
+  window.scrollTo({top:0,behavior:'instant'});
+  document.getElementById('sidebar').classList.remove('open');
+}
+document.getElementById('prevBtn').addEventListener('click',()=>go(current-1));
+document.getElementById('nextBtn').addEventListener('click',()=>{markDone(MODULES[current].id);go(Math.min(current+1,MODULES.length-1));});
+function markDone(id){State.done.add(id);State.save();refreshNav();}
+
+/* ---------- Python syntax highlighter (no libs) ---------- */
+const PY_KW=new Set(['import','from','as','def','class','return','if','elif','else','for','while','in','not','and','or','is','with','lambda','None','True','False','self','super','pass','break','continue','yield','assert','try','except','finally','raise','global','nonlocal','del','print']);
+const PY_BUILTIN=new Set(['range','len','enumerate','zip','int','float','str','list','dict','tuple','set','print','sum','min','max','abs','torch','nn','F','math','optim']);
+function highlightPython(code){
+  // tokenize line by line, comments and strings first
+  const out=[];
+  const lines=code.split('\n');
+  for(let line of lines){
+    let res='';let i=0;
+    while(i<line.length){
+      const rest=line.slice(i);
+      // comment
+      let m;
+      if((m=rest.match(/^#.*/))){res+=`<span class="tok-com">${esc(m[0])}</span>`;i+=m[0].length;continue;}
+      // triple/normal strings
+      if((m=rest.match(/^(f?"""[\s\S]*?"""|f?'''[\s\S]*?'''|f?"(?:[^"\\]|\\.)*"|f?'(?:[^'\\]|\\.)*')/))){
+        res+=`<span class="tok-str">${esc(m[0])}</span>`;i+=m[0].length;continue;}
+      // number
+      if((m=rest.match(/^\d+\.?\d*(e-?\d+)?/))){res+=`<span class="tok-num">${esc(m[0])}</span>`;i+=m[0].length;continue;}
+      // identifier
+      if((m=rest.match(/^[A-Za-z_]\w*/))){
+        const w=m[0];let cls='';
+        if(w==='self')cls='tok-self';
+        else if(PY_KW.has(w))cls='tok-kw';
+        else if(PY_BUILTIN.has(w))cls='tok-builtin';
+        else{
+          // function definition / call
+          const after=line.slice(i+w.length).match(/^\s*\(/);
+          const before=res.endsWith('class="tok-kw">def</span> ')||/\bdef\s$/.test(stripTags(res));
+          if(after)cls='tok-fn';
+        }
+        res+= cls?`<span class="${cls}">${esc(w)}</span>`:esc(w);
+        i+=w.length;continue;
+      }
+      // operators / punctuation
+      res+=esc(line[i]);i++;
+    }
+    out.push(res);
+  }
+  return out.join('\n');
+}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function stripTags(s){return s.replace(/<[^>]+>/g,'');}
+function highlightAll(){
+  document.querySelectorAll('pre[data-py]').forEach(pre=>{
+    if(pre.dataset.done)return;
+    pre.innerHTML=highlightPython(pre.textContent);
+    pre.dataset.done='1';
+  });
+}
+/* code block helper */
+function codeBlock(fname,code,{collapsible=false,collapsed=false}={}){
+  const id='cb'+(codeBlock._n=(codeBlock._n||0)+1);
+  return `<div class="code-block">
+    <div class="code-head">
+      <span class="dot" style="background:#ff6b81"></span>
+      <span class="dot" style="background:#f2c879"></span>
+      <span class="dot" style="background:#7ee787"></span>
+      <span class="fname">${fname}</span>
+      ${collapsible?`<span class="toggle" onclick="(function(t){const p=document.getElementById('${id}');const c=p.classList.toggle('collapsed');t.textContent=c?'expand ▸':'collapse ▾';})(this)">${collapsed?'expand ▸':'collapse ▾'}</span>`:''}
+    </div>
+    <pre id="${id}" data-py class="${collapsed?'collapsed':''}">${esc(code)}</pre>
+  </div>`;
+}
+/* quiz helper: questions=[{q,opts:[],a:index,why}] */
+function quizBlock(questions){
+  const qid='qz'+(quizBlock._n=(quizBlock._n||0)+1);
+  let html=`<div class="quiz" id="${qid}">`;
+  questions.forEach((qq,qi)=>{
+    html+=`<div class="q"><div class="qtext"><span class="qn">Q${qi+1}.</span>${qq.q}</div>`;
+    qq.opts.forEach((o,oi)=>{
+      html+=`<div class="opt" data-correct="${oi===qq.a}" onclick="answerQuiz(this,${qi})">${o}</div>`;
+    });
+    html+=`<div class="explain" id="${qid}_e${qi}">${qq.why}</div></div>`;
+  });
+  html+='</div>';
+  return html;
+}
+function answerQuiz(el,qi){
+  const q=el.closest('.q');
+  if(q.dataset.answered)return;
+  q.dataset.answered='1';
+  el.classList.add('chosen');
+  q.querySelectorAll('.opt').forEach(o=>{
+    if(o.dataset.correct==='true')o.classList.add('correct');
+    else if(o===el)o.classList.add('wrong');
+    o.style.pointerEvents='none';
+  });
+  const quiz=q.closest('.quiz');
+  const exp=document.getElementById(quiz.id+'_e'+qi);
+  if(exp)exp.classList.add('show');
+}
+/* heatmap on canvas given 2D array (values 0..1 expected or auto-normalized) */
+function drawHeatmap(canvas,data,opts={}){
+  const ctx=canvas.getContext('2d');
+  const rows=data.length,cols=data[0].length;
+  const pad=opts.pad||38;
+  const W=canvas.width,H=canvas.height;
+  const cw=(W-pad-10)/cols, ch=(H-pad-10)/rows;
+  ctx.clearRect(0,0,W,H);
+  let mn=Infinity,mx=-Infinity;
+  data.forEach(r=>r.forEach(v=>{if(isFinite(v)){mn=Math.min(mn,v);mx=Math.max(mx,v);}}));
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    let v=data[r][c];
+    const x=pad+c*cw, y=pad+r*ch;
+    if(!isFinite(v)||v===null){ // masked
+      ctx.fillStyle='#1c2130';ctx.fillRect(x,y,cw-2,ch-2);
+      ctx.strokeStyle='#323b54';ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+cw-2,y+ch-2);ctx.stroke();
+      continue;
+    }
+    const t=mx>mn?(v-mn)/(mx-mn):0.5;
+    // teal->amber colormap
+    const col=lerpColor([18,40,46],[242,166,90],t);
+    ctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
+    ctx.fillRect(x,y,cw-2,ch-2);
+    ctx.fillStyle=t>0.55?'#1a1206':'#cfe8e0';
+    ctx.font='11px ui-monospace,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(v.toFixed(2),x+cw/2,y+ch/2);
+  }
+  ctx.fillStyle='#a7a899';ctx.font='11px ui-monospace,monospace';
+  const rl=opts.rowLabels||[],cl=opts.colLabels||[];
+  ctx.textAlign='right';ctx.textBaseline='middle';
+  for(let r=0;r<rows;r++)if(rl[r])ctx.fillText(rl[r],pad-6,pad+r*ch+ch/2);
+  ctx.textAlign='center';ctx.textBaseline='bottom';
+  for(let c=0;c<cols;c++)if(cl[c])ctx.fillText(cl[c],pad+c*cw+cw/2,pad-6);
+}
+function lerpColor(a,b,t){return[a[0]+(b[0]-a[0])*t|0,a[1]+(b[1]-a[1])*t|0,a[2]+(b[2]-a[2])*t|0];}
+function softmaxRow(arr){
+  const m=Math.max(...arr.filter(isFinite));
+  const ex=arr.map(v=>isFinite(v)?Math.exp(v-m):0);
+  const s=ex.reduce((a,b)=>a+b,0);
+  return ex.map(v=>v/s);
+}
+</script>
+<script>
+/* ---------- shared module render helpers ---------- */
+function header(num,title,tag,lead){
+  return `<div class="topbar"><div><div class="kicker">Module ${num}</div>
+    <h1 class="module-title">${title}</h1>
+    <div class="module-tag">${tag}</div></div></div>
+    <p class="lead">${lead}</p>`;
+}
+const STEP_KINDS={intuition:['Step 1','Intuition'],visual:['Step 2','Visual'],math:['Step 3','Mathematics'],
+  dims:['Step 4','Dimensions'],numeric:['Step 5','Numerical'],code:['Step 6','PyTorch'],
+  quiz:['Step 7','Quiz'],mistakes:['Step 8','Mistakes']};
+function step(kind,html,labelOverride){
+  const [badge,label]=STEP_KINDS[kind]||['',''];
+  return `<h2 class="step ${kind}"><span class="badge">${badge}</span>${labelOverride||label}</h2>${html}`;
+}
+function matCell(v,cls=''){return `<div class="cell ${cls}">${v}</div>`;}
+function matrix(label,shape,grid,opts={}){
+  const cols=grid[0].length;
+  let cells='';
+  grid.forEach((row,r)=>row.forEach((v,c)=>{
+    cells+=`<div class="cell" data-r="${r}" data-c="${c}">${v}</div>`;
+  }));
+  return `<div class="mat"><div class="label">${label} <span class="shape">${shape}</span></div>
+    <div class="grid-mat" style="grid-template-columns:repeat(${cols},auto)">${cells}</div></div>`;
+}
+function shapeRow(stage,shape){
+  return `<div class="row"><span class="stage">${stage}</span><span class="arrow">→</span><span class="shape">${shape}</span></div>`;
+}
+/* ===================== MODULE 0 ===================== */
+MODULES.push({
+id:'m0',num:'0',section:'Foundations',title:'Why Transformers Exist',
+render(){return header('0','Why Transformers Exist',
+  'RNNs · LSTMs · parallelization · long-range dependencies',
+  'Before attention, sequence models read text one word at a time, like reading through a straw. This module shows exactly why that hurt, and why letting every token look at every other token all at once changed everything.')
++ step('intuition',`
+<p>Imagine reading a 1,000-word essay but only being allowed to remember a single sticky note as you go. After each word you rewrite the note, then throw the word away. By the end, the opening sentence survives only as a faint smudge on that note. That smudge is the <em class="key">hidden state</em> of a Recurrent Neural Network (RNN).</p>
+<p>RNNs process a sequence <strong>step by step</strong>: hidden state <code>h₁ → h₂ → h₃ → …</code>. Each new word updates the note. Three structural problems follow directly from this design:</p>
+<ul>
+<li><strong>Sequential bottleneck</strong> — word <em>t</em> cannot be computed until word <em>t−1</em> finishes. No parallelism, so training on long sequences is slow.</li>
+<li><strong>Vanishing/exploding gradients</strong> — to learn that word 1 matters for word 1000, the gradient must survive ~1000 multiplications. It shrinks to nothing (vanishes) or blows up.</li>
+<li><strong>Information squeeze</strong> — the entire past is crammed into one fixed-size vector. Early information is steadily overwritten.</li>
+</ul>
+<p>LSTMs and GRUs add gates that <em>protect</em> the note (a "cell state" with learned forget/input gates). This stretches usable memory from ~10 to maybe ~100+ steps, and it dampens vanishing gradients. But the core flaw remains: <strong>computation is still sequential, and distant tokens still communicate only by relaying through every token in between</strong>.</p>
+<div class="callout idea"><span class="h">The Transformer's bet</span>Delete recurrence entirely. Let every token directly look at every other token in <em>one</em> parallel operation called <strong>self-attention</strong>. Distance between token 1 and token 1000 becomes a single hop, not 999.</div>`)
++ step('visual',`
+<p>Watch information travel. <strong>Top:</strong> an RNN relays a signal hop-by-hop — the influence of token 0 fades as it passes through each hidden state. <strong>Bottom:</strong> a Transformer connects every token to every other token simultaneously, in one shot.</p>
+<div class="canvas-wrap"><canvas id="rnnCanvas" width="900" height="340"></canvas></div>
+<div class="btn-row"><button class="btn" id="rnnPlay">▶ Play animation</button><button class="btn ghost" id="rnnReset">Reset</button></div>
+<div class="legend"><span><span class="sw" style="background:#5eead4"></span>token / hidden state</span><span><span class="sw" style="background:#f2a65a"></span>active signal path</span><span><span class="sw" style="background:#6f7382"></span>weak / faded influence</span></div>`)
++ step('math',`
+<p>An RNN defines the hidden state recursively:</p>
+<div class="eq">h<sub>t</sub> <span class="op">=</span> tanh( <span class="v">W<sub>h</sub></span> h<sub>t-1</sub> <span class="op">+</span> <span class="v">W<sub>x</sub></span> x<sub>t</sub> <span class="op">+</span> b )</div>
+<p>The dependence of the loss on an early input passes through a product of Jacobians:</p>
+<div class="eq"><span class="frac"><span class="top">∂h<sub>t</sub></span><span class="bot">∂h<sub>k</sub></span></span> <span class="op">=</span> ∏<span class="small">(k&lt;i≤t)</span> <span class="frac"><span class="top">∂h<sub>i</sub></span><span class="bot">∂h<sub>i-1</sub></span></span></div>
+<p>If the typical factor has magnitude <code>&lt; 1</code>, this product decays exponentially in <code>(t−k)</code> → <strong>vanishing gradient</strong>. If <code>&gt; 1</code>, it explodes. Self-attention replaces this chain with a <em>direct</em> weighted sum, so the path length between any two positions is <strong>O(1)</strong> instead of <strong>O(distance)</strong>.</p>
+<table><tr><th>Property</th><th>RNN / LSTM</th><th>Transformer (self-attention)</th></tr>
+<tr><td>Path length between distant tokens</td><td>O(n)</td><td>O(1)</td></tr>
+<tr><td>Sequential operations</td><td>O(n)</td><td>O(1) — fully parallel</td></tr>
+<tr><td>Compute per layer</td><td>O(n·d²)</td><td>O(n²·d)</td></tr>
+<tr><td>Parallelizable over sequence?</td><td>No</td><td>Yes</td></tr></table>
+<p>The Transformer trades cheaper-but-serial work for more-but-parallel work. On modern GPUs, "parallel" wins decisively — even though it costs O(n²) compute, you do it all at once.</p>`)
++ step('dims',`
+<p>For a sequence of length <code>n</code> with model dimension <code>d</code>:</p>
+<div class="shape-flow">
+${shapeRow('RNN: process tokens','one h-vector reused → [d] at each of n steps (serial)')}
+${shapeRow('Transformer: input','X = [n, d] — all tokens stacked, processed together')}
+${shapeRow('Attention scores','QKᵀ = [n, n] — every token vs every token')}
+</div>
+<p>That <span class="shape-pill">[n, n]</span> matrix is the whole point: it is the explicit, learnable map of "who looks at whom".</p>`)
++ step('numeric',`
+<p>Take 3 tokens. In an RNN, token 3's representation depends on token 1 only through <code>h₁→h₂→h₃</code> — two hops, two chances to forget. In attention, token 3 forms a weighted average:</p>
+<div class="eq">out<sub>3</sub> <span class="op">=</span> 0.6·v<sub>1</sub> <span class="op">+</span> 0.1·v<sub>2</sub> <span class="op">+</span> 0.3·v<sub>3</sub></div>
+<p>If token 1 matters most, attention can simply assign it weight <code>0.6</code> — directly, no relay. The model <em>learns</em> these weights from data.</p>`)
++ step('code',`
+<p>A minimal RNN cell vs. the one-liner that is the heart of attention — note the absence of any loop over time in the second.</p>
+${codeBlock('rnn_vs_attention.py',
+`import torch, torch.nn.functional as F
+
+# ---- RNN: a Python loop over time (sequential) ----
+def rnn(X, Wx, Wh, b):                  # X: [n, d]
+    h = torch.zeros(Wh.shape[0])
+    outs = []
+    for t in range(X.shape[0]):         # <- cannot parallelize this
+        h = torch.tanh(Wx @ X[t] + Wh @ h + b)
+        outs.append(h)
+    return torch.stack(outs)            # [n, d]
+
+# ---- Attention: no time loop, one matmul does all tokens ----
+def attention(Q, K, V):                 # each [n, d]
+    scores = Q @ K.transpose(-2, -1)    # [n, n]  every token vs every token
+    weights = F.softmax(scores / Q.shape[-1] ** 0.5, dim=-1)
+    return weights @ V                  # [n, d]  parallel over all positions`)}`)
++ step('quiz',quizBlock([
+  {q:'What is the main reason RNNs are hard to parallelize during training?',
+   opts:['They use too much memory','Hidden state h<sub>t</sub> depends on h<sub>t−1</sub>, forcing sequential computation','Softmax is expensive','They have too many parameters'],
+   a:1,why:'Each step needs the previous step\'s output, so steps cannot run at the same time. Attention removes this dependency.'},
+  {q:'In an RNN, the path length for a gradient to travel between token 1 and token 1000 is roughly:',
+   opts:['O(1)','O(log n)','O(n)','O(n²)'],a:2,
+   why:'The signal must pass through every intermediate hidden state — about n steps — which is exactly why gradients vanish over long distances.'},
+  {q:'Self-attention\'s compute per layer scales as:',
+   opts:['O(n·d)','O(n²·d)','O(n·d²)','O(d²)'],a:1,
+   why:'The n×n score matrix multiplied through dimension d gives O(n²·d). It costs more total work than an RNN but does it fully in parallel.'},
+  {q:'LSTMs improved on vanilla RNNs primarily by:',
+   opts:['Removing the hidden state','Adding gating + a cell state to better preserve long-range information','Processing tokens in parallel','Using attention'],
+   a:1,why:'Gates (forget/input/output) and a protected cell state let LSTMs carry information much further — but they are still sequential.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Misconception</span>"Transformers have no notion of order." — False. They are <em>permutation-equivariant by default</em>, which is why we add <strong>positional encodings</strong> (Module 3). Order is injected, not inherited.</div>
+<div class="callout warn"><span class="h">Misconception</span>"Attention is cheaper than an RNN." — It is more <em>parallel</em>, not cheaper in FLOPs. The O(n²) term is exactly what KV-caching and Flash/Sparse attention later try to tame.</div>
+<div class="callout warn"><span class="h">Misconception</span>"LSTMs solved vanishing gradients completely." — They dampen it substantially but do not eliminate it, and they remain sequential.</div>`);
+},
+init(){
+  const cv=document.getElementById('rnnCanvas');if(!cv)return;
+  const ctx=cv.getContext('2d');const N=6;let t=0,playing=false,raf=null;
+  const xs=[];for(let i=0;i<N;i++)xs.push(120+i*120);
+  const yTop=110,yBot=250;
+  function node(x,y,label,alpha=1,fill='#5eead4'){
+    ctx.globalAlpha=alpha;ctx.beginPath();ctx.arc(x,y,20,0,7);ctx.fillStyle=fill;ctx.fill();
+    ctx.globalAlpha=1;ctx.fillStyle='#0c0e14';ctx.font='bold 13px ui-monospace,monospace';
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,x,y);
+  }
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.fillStyle='#a7a899';ctx.font='13px ui-sans-serif';ctx.textAlign='left';
+    ctx.fillText('RNN — signal relays hop by hop, fading',24,40);
+    ctx.fillText('Transformer — every token connects directly, at once',24,196);
+    // RNN top: chain
+    for(let i=0;i<N-1;i++){
+      const active=playing&&t>i;
+      ctx.strokeStyle=active?'#f2a65a':'#39415a';
+      ctx.lineWidth=active?3:1.5;ctx.beginPath();ctx.moveTo(xs[i]+20,yTop);ctx.lineTo(xs[i+1]-20,yTop);ctx.stroke();
+    }
+    for(let i=0;i<N;i++){
+      const reached=playing? t>=i :false;
+      const fade=reached? Math.max(0.25,1-(t-i)*0.13):0.5;
+      node(xs[i],yTop,'h'+(i+1),playing?(reached?fade:0.3):0.85,reached?'#f2a65a':'#5eead4');
+    }
+    // Transformer bottom: full connections drawn progressively
+    const lim=playing?Math.min(1,t/ (N-1)) :0;
+    ctx.lineWidth=1.4;
+    for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){
+      const on= !playing || (j-i) <= Math.ceil(lim*(N-1));
+      ctx.globalAlpha=on?0.5:0.06;ctx.strokeStyle='#f2a65a';
+      ctx.beginPath();ctx.moveTo(xs[i],yBot+18);ctx.quadraticCurveTo((xs[i]+xs[j])/2,yBot+70,xs[j],yBot+18);ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+    for(let i=0;i<N;i++)node(xs[i],yBot,'t'+(i+1),1,'#5eead4');
+  }
+  function loop(){t+=0.04;if(t>N+1){playing=false;}draw();if(playing)raf=requestAnimationFrame(loop);}
+  draw();
+  document.getElementById('rnnPlay').onclick=()=>{if(playing)return;t=0;playing=true;loop();};
+  document.getElementById('rnnReset').onclick=()=>{playing=false;t=0;cancelAnimationFrame(raf);draw();};
+}
+});
+
+/* ===================== MODULE 1 ===================== */
+MODULES.push({
+id:'m1',num:'1',section:'Inputs',title:'Tokenization',
+render(){return header('1','Tokenization',
+  'text → tokens → token IDs',
+  'A neural network only understands numbers. Tokenization is the bridge: it chops raw text into discrete pieces (tokens) and assigns each an integer ID drawn from a fixed vocabulary.')
++ step('intuition',`
+<p>You cannot feed the letter "I" into matrix multiplication. So step one of every language model is turning text into integers the model can index with.</p>
+<p>Modern LLMs use <em class="key">subword</em> tokenization (Byte-Pair Encoding / BPE, used by GPT). Common words become single tokens; rare words split into reusable chunks. This keeps the vocabulary small (~50k for GPT-2) while still representing any string — including words it has never seen, like "antidisestablishmentarianism".</p>
+<p>For learning, we'll use a tiny <strong>word-level</strong> vocabulary. The principle is identical: every distinct token maps to one integer ID.</p>`)
++ step('visual',`
+<p>Click <strong>Tokenize</strong> to watch the sentence flow through the pipeline, one stage at a time.</p>
+<div class="card" id="tokStage"></div>
+<div class="btn-row"><button class="btn" id="tokGo">▶ Tokenize step-by-step</button><button class="btn ghost" id="tokReset">Reset</button></div>`)
++ step('math',`
+<p>Tokenization is a function from strings to sequences of integers:</p>
+<div class="eq">tokenize : string <span class="op">→</span> [ id<sub>1</sub>, id<sub>2</sub>, …, id<sub>n</sub> ],  where each id<sub>i</sub> <span class="op">∈</span> {0,…,V−1}</div>
+<p><code>V</code> is the <strong>vocabulary size</strong>. The mapping is just a lookup in a dictionary <code>token → id</code> (the encoder) and its inverse <code>id → token</code> (the decoder). There is no learning here — it is deterministic table lookup. (BPE's <em>merge rules</em> are learned beforehand, but at inference time it's still a lookup.)</p>`)
++ step('dims',`
+<p>Tokenization changes type, then we add a batch dimension for training:</p>
+<div class="shape-flow">
+${shapeRow('Raw text','"I love machine learning" (a string)')}
+${shapeRow('Token IDs','[5, 8, 3, 7] — a 1-D integer tensor, shape [4]')}
+${shapeRow('Batched','[B, T] = [1, 4] (B sequences, each of length T)')}
+</div>`)
++ step('numeric',`
+<p>Here is a toy vocabulary and the encoding of our sentence:</p>
+<table><tr><th>token</th><th>ID</th></tr>
+<tr><td>"&lt;pad&gt;"</td><td>0</td></tr><tr><td>"machine"</td><td>3</td></tr>
+<tr><td>"I"</td><td>5</td></tr><tr><td>"learning"</td><td>7</td></tr><tr><td>"love"</td><td>8</td></tr></table>
+<p><code>"I love machine learning"</code> → tokens <code>["I","love","machine","learning"]</code> → IDs <code>[5, 8, 3, 7]</code>.</p>`)
++ step('code',`
+${codeBlock('tokenize.py',
+`text = "I love machine learning"
+
+# Build a vocabulary: every unique token gets an integer id
+vocab = {"<pad>": 0, "machine": 3, "I": 5, "learning": 7, "love": 8}
+inv_vocab = {i: t for t, i in vocab.items()}   # id -> token, for decoding
+
+def encode(s):
+    return [vocab[tok] for tok in s.split()]   # word-level split
+
+def decode(ids):
+    return " ".join(inv_vocab[i] for i in ids)
+
+ids = encode(text)          # [5, 8, 3, 7]
+print(ids)
+print(decode(ids))          # "I love machine learning"
+
+import torch
+x = torch.tensor(ids).unsqueeze(0)   # add batch dim -> shape [1, 4]
+print(x.shape)              # torch.Size([1, 4])`)}`)
++ step('quiz',quizBlock([
+  {q:'Why must text be tokenized before entering a Transformer?',
+   opts:['To compress the file','Because the network operates on numeric tensors, not raw characters','To remove punctuation','To translate languages'],
+   a:1,why:'Every operation inside the model is arithmetic on tensors. Tokens → integer IDs give the model something to index and embed.'},
+  {q:'A vocabulary size V=50000 means:',
+   opts:['Each sentence has 50000 tokens','There are 50000 distinct tokens the model can represent','The embedding dimension is 50000','The context length is 50000'],
+   a:1,why:'V is the number of distinct token types. Each gets one row in the embedding matrix and one output logit.'},
+  {q:'Subword (BPE) tokenization helps mainly because it:',
+   opts:['Eliminates all unknown words while keeping the vocabulary small','Makes sequences shorter than characters always','Removes the need for embeddings','Guarantees one token per word'],
+   a:0,why:'BPE represents rare/unseen words as combinations of known subword pieces, so nothing is truly "unknown" yet V stays manageable.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Confusing token count with word count. With BPE, one word can be several tokens ("learning" → "learn"+"ing"), and a space is often part of a token.</div>
+<div class="callout warn"><span class="h">Mistake</span>Using a different tokenizer at inference than at training. IDs are only meaningful relative to the exact vocabulary they were trained with.</div>
+<div class="callout warn"><span class="h">Mistake</span>Thinking token IDs carry meaning. ID 8 is not "more" than ID 5 — they are arbitrary labels. Meaning is added in the next step: embeddings.</div>`);
+},
+init(){
+  const tokens=['I','love','machine','learning'];const ids=[5,8,3,7];
+  const stage=document.getElementById('tokStage');if(!stage)return;
+  let s=0;
+  function render(){
+    let h=`<div style="font-family:var(--mono);font-size:15px">`;
+    h+=`<div style="margin:6px 0"><span style="color:var(--ink-faint)">text:&nbsp;</span><span style="color:var(--ink)">"I love machine learning"</span></div>`;
+    if(s>=1){h+=`<div style="margin:10px 0"><span style="color:var(--ink-faint)">tokens:</span> `+
+      tokens.map((t,i)=>`<span class="cell ${s>=1?'hl':''}" style="display:inline-flex;width:auto;padding:0 10px;margin:0 4px;animation:fade .3s ${i*0.08}s both">${t}</span>`).join('')+`</div>`;}
+    if(s>=2){h+=`<div style="margin:10px 0;color:var(--ink-faint)">↓ vocab lookup</div>`;
+      h+=`<div style="margin:6px 0"><span style="color:var(--ink-faint)">IDs:&nbsp;&nbsp;&nbsp;</span> `+
+      ids.map((id,i)=>`<span class="cell hlv" style="display:inline-flex;width:auto;padding:0 12px;margin:0 4px;animation:fade .3s ${i*0.08}s both">${id}</span>`).join('')+`</div>`;}
+    if(s>=3){h+=`<div style="margin:10px 0;color:var(--ink-faint)">↓ add batch dim</div><div style="color:var(--teal)">tensor shape: [B=1, T=4]</div>`;}
+    h+='</div>';stage.innerHTML=h;
+  }
+  render();
+  document.getElementById('tokGo').onclick=()=>{s=Math.min(3,s+1);render();};
+  document.getElementById('tokReset').onclick=()=>{s=0;render();};
+}
+});
+
+/* ===================== MODULE 2 ===================== */
+MODULES.push({
+id:'m2',num:'2',section:'Inputs',title:'Embeddings',
+render(){return header('2','Embeddings',
+  'turning IDs into meaning · nn.Embedding',
+  'A token ID is an arbitrary label. Embeddings replace each ID with a learnable dense vector — a position in "meaning space" that the model nudges during training so similar tokens end up nearby.')
++ step('intuition',`
+<p>Token ID 8 ("love") and ID 5 ("I") are just integers. The number 8 is not "bigger in meaning" than 5 — comparing them arithmetically is nonsense. We need a representation where <em>distance</em> and <em>direction</em> encode relationships.</p>
+<p>An <strong>embedding</strong> is a lookup table: a matrix <code>E</code> of shape <span class="shape-pill">[V, d]</span>. Row <code>i</code> is the <code>d</code>-dimensional vector for token <code>i</code>. To embed a token, you <em>select its row</em> — that's it. No matrix multiply, just indexing.</p>
+<p>These vectors start random and are <em class="key">trained</em>. Gradient descent slowly arranges them so that tokens used in similar ways point in similar directions. This is why "king − man + woman ≈ queen" emerges.</p>`)
++ step('visual',`
+<p>Our toy embedding matrix: vocabulary size <strong>V = 5</strong>, dimension <strong>d = 4</strong>. Click any token ID below to watch its row get selected and "pulled out" as a vector.</p>
+<div class="matrix-stage"><div id="embMat"></div><div class="mat-op">→</div><div id="embOut"><div class="mat"><div class="label">selected vector <span class="shape">[4]</span></div><div class="grid-mat" id="embVec"><div class="cell" style="width:54px;color:var(--ink-faint)">?</div></div></div></div></div>
+<div class="btn-row" id="embBtns"></div>`)
++ step('math',`
+<p>Let <code>E ∈ ℝ<sup>V×d</sup></code> be the embedding matrix and <code>i</code> a token ID. The embedding is:</p>
+<div class="eq">emb(i) <span class="op">=</span> E<sub>i,:</sub>  <span class="small">(row i of E)</span></div>
+<p>Equivalently, it's a matrix product with a one-hot vector <code>e<sub>i</sub> ∈ ℝ<sup>V</sup></code>:</p>
+<div class="eq">emb(i) <span class="op">=</span> e<sub>i</sub><sup>⊤</sup> E,  <span class="small">where e<sub>i</sub> has a 1 at index i and 0 elsewhere</span></div>
+<p>This identity is why an embedding lookup is just an (extremely cheap) special case of a linear layer. We never actually build the one-hot — we index directly.</p>`)
++ step('dims',`
+<div class="shape-flow">
+${shapeRow('Embedding matrix E','[V, d] = [5, 4]')}
+${shapeRow('Input token IDs','[B, T] = [1, 4]')}
+${shapeRow('After embedding lookup','[B, T, d] = [1, 4, 4]')}
+</div>
+<p>The rule: embedding maps <span class="shape-pill">[B, T]</span> integers → <span class="shape-pill">[B, T, d]</span> floats. Each integer becomes a vector; one new trailing dimension <code>d</code> appears.</p>`)
++ step('numeric',`
+<p>Suppose <code>E</code> is:</p>
+<table><tr><th>ID</th><th>e₀</th><th>e₁</th><th>e₂</th><th>e₃</th></tr>
+<tr><td>0</td><td>0.10</td><td>-0.20</td><td>0.05</td><td>0.30</td></tr>
+<tr><td>1</td><td>0.40</td><td>0.10</td><td>-0.30</td><td>0.20</td></tr>
+<tr><td>2</td><td>-0.10</td><td>0.50</td><td>0.20</td><td>-0.40</td></tr>
+<tr><td>3</td><td>0.30</td><td>-0.10</td><td>0.60</td><td>0.10</td></tr>
+<tr><td>4</td><td>-0.20</td><td>0.20</td><td>0.10</td><td>0.50</td></tr></table>
+<p>Embedding token ID <code>3</code> simply returns row 3: <code>[0.30, -0.10, 0.60, 0.10]</code>. No arithmetic — a memory read.</p>`)
++ step('code',`
+${codeBlock('embeddings.py',
+`import torch
+import torch.nn as nn
+
+V, d = 5, 4                      # vocab size, embedding dimension
+emb = nn.Embedding(V, d)         # creates a learnable [V, d] weight matrix
+
+ids = torch.tensor([[5 % V, 8 % V, 3, 7 % V]])  # shape [B=1, T=4]
+vectors = emb(ids)               # shape [1, 4, 4]
+print(vectors.shape)             # torch.Size([1, 4, 4])
+
+# emb.weight IS the lookup table E:
+print(emb.weight.shape)          # torch.Size([5, 4])
+# emb(token_id) == emb.weight[token_id]  (a row selection)`)}
+<div class="explain-row">
+<div class="ln"><b>nn.Embedding(V, d)</b> — allocates a [V, d] matrix of learnable weights, initialized randomly (normal).</div>
+<div class="ln"><b>emb(ids)</b> — for each integer in <code>ids</code>, selects the matching row. Output gains a trailing dim of size <code>d</code>.</div>
+<div class="ln"><b>emb.weight</b> — the raw table; gradients flow into the rows that were actually used in the batch.</div>
+</div>`)
++ step('quiz',quizBlock([
+  {q:'An nn.Embedding(50000, 768) layer contains how many learnable parameters?',
+   opts:['768','50000','50000 × 768 = 38.4M','768²'],a:2,
+   why:'It is a [V, d] = [50000, 768] matrix, so V·d parameters — one row per token, each of length d.'},
+  {q:'Embedding a tensor of shape [B, T] produces shape:',
+   opts:['[B, T]','[B, T, d]','[B, d]','[V, d]'],a:1,
+   why:'Each integer is replaced by a d-vector, adding a trailing dimension: [B, T] → [B, T, d].'},
+  {q:'How is an embedding lookup mathematically equivalent to a linear layer?',
+   opts:['It is not','It equals a one-hot vector times the embedding matrix','It uses softmax','It applies ReLU'],a:1,
+   why:'emb(i) = (one-hot eᵢ)ᵀ E selects row i. We skip building the one-hot and index directly for efficiency.'},
+  {q:'Why do embeddings capture meaning while raw IDs do not?',
+   opts:['IDs are too large','Embeddings are trained so similar tokens get nearby vectors','IDs are negative','Embeddings are random forever'],
+   a:1,why:'Gradient descent arranges the vectors during training; geometric closeness then reflects usage similarity.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Building an actual one-hot matrix and multiplying. It works but wastes memory; <code>nn.Embedding</code> indexes directly.</div>
+<div class="callout warn"><span class="h">Mistake</span>Forgetting embeddings are trainable. They are not fixed word2vec vectors here — they update with the rest of the model.</div>
+<div class="callout warn"><span class="h">Mistake</span>Confusing embedding dimension <code>d</code> with vocabulary size <code>V</code>. <code>V</code> = number of tokens (rows); <code>d</code> = length of each vector (columns).</div>`);
+},
+init(){
+  const E=[[0.10,-0.20,0.05,0.30],[0.40,0.10,-0.30,0.20],[-0.10,0.50,0.20,-0.40],[0.30,-0.10,0.60,0.10],[-0.20,0.20,0.10,0.50]];
+  const host=document.getElementById('embMat');if(!host)return;
+  host.innerHTML=matrix('E','[5, 4]',E.map(r=>r.map(x=>x.toFixed(2))));
+  const btns=document.getElementById('embBtns');
+  btns.innerHTML=[0,1,2,3,4].map(i=>`<button class="btn ghost" data-i="${i}">ID ${i}</button>`).join('');
+  btns.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.i;
+    host.querySelectorAll('.cell').forEach(c=>c.classList.remove('hl'));
+    host.querySelectorAll(`.cell[data-r="${i}"]`).forEach(c=>c.classList.add('hl'));
+    document.getElementById('embVec').innerHTML=E[i].map(x=>`<div class="cell hl">${x.toFixed(2)}</div>`).join('');
+    document.getElementById('embVec').style.gridTemplateColumns='repeat(4,auto)';
+  });
+}
+});
+
+/* ===================== MODULE 3 ===================== */
+MODULES.push({
+id:'m3',num:'3',section:'Inputs',title:'Positional Encoding',
+render(){return header('3','Positional Encoding',
+  'injecting order · sinusoidal & learned',
+  'Self-attention is order-blind: shuffle the tokens and it gives the same answer. Positional encodings add a unique "address" to each position so the model can tell "dog bites man" from "man bites dog".')
++ step('intuition',`
+<p>Attention computes a weighted sum over all tokens. A sum doesn't care about order — <code>a + b + c = c + b + a</code>. So the raw mechanism is <em class="key">permutation-equivariant</em>: it literally cannot perceive sequence order.</p>
+<p>The fix: give every position its own vector (a "stamp") and <strong>add</strong> it to the token embedding. Now position 0's "the" and position 5's "the" enter attention as different vectors, so the model can use order.</p>
+<p>Two common schemes: <strong>learned</strong> positional embeddings (a second <code>nn.Embedding</code> indexed by position — what GPT-2 uses) and <strong>sinusoidal</strong> encodings (fixed sine/cosine waves — from the original Transformer). We cover both.</p>`)
++ step('visual',`
+<p>The final input vector is an elementwise sum. Watch token embedding + positional embedding combine, slot by slot:</p>
+<div class="matrix-stage">
+<div class="mat"><div class="label">token emb <span class="shape">[4]</span></div><div class="grid-mat" id="peTok"></div></div>
+<div class="mat-op">+</div>
+<div class="mat"><div class="label">pos emb <span class="shape">[4]</span></div><div class="grid-mat" id="pePos"></div></div>
+<div class="mat-op">=</div>
+<div class="mat"><div class="label">input <span class="shape">[4]</span></div><div class="grid-mat" id="peSum"></div></div>
+</div>
+<div class="btn-row"><button class="btn" id="peStep">▶ Add elementwise</button><button class="btn ghost" id="peReset">Reset</button></div>
+<h3>Sinusoidal encoding explorer</h3>
+<p>Each curve is one embedding dimension as a function of position. Low dimensions wave slowly (coarse position); high dimensions wave fast (fine position). Together they form a unique fingerprint per position.</p>
+<div class="controls">
+<div class="control"><label>model dim d</label><input type="range" id="peDim" min="4" max="32" step="2" value="16"><span class="val" id="peDimV">16</span></div>
+<div class="control"><label>positions shown</label><input type="range" id="peLen" min="10" max="60" step="2" value="40"><span class="val" id="peLenV">40</span></div>
+</div>
+<div class="canvas-wrap"><canvas id="peCanvas" width="900" height="320"></canvas></div>`)
++ step('math',`
+<p>The sinusoidal encoding for position <code>pos</code> and dimension <code>i</code>:</p>
+<div class="eq">PE(pos, 2i)&nbsp;&nbsp;<span class="op">=</span> sin( pos / 10000<sup>2i/d</sup> )</div>
+<div class="eq">PE(pos, 2i+1) <span class="op">=</span> cos( pos / 10000<sup>2i/d</sup> )</div>
+<p>Even dimensions use sine, odd use cosine, with wavelengths growing geometrically from 2π to ~10000·2π. Key property: for any fixed offset <code>k</code>, <code>PE(pos+k)</code> is a <em>linear function</em> of <code>PE(pos)</code> (a rotation). This lets attention learn relative offsets like "the token 3 back" with simple linear maps.</p>
+<p>The input to the first Transformer block is:</p>
+<div class="eq">Z <span class="op">=</span> <span class="v">TokenEmb</span>(ids) <span class="op">+</span> <span class="v">PosEmb</span>(positions)</div>`)
++ step('dims',`
+<div class="shape-flow">
+${shapeRow('Token embeddings','[B, T, d]')}
+${shapeRow('Positional embeddings','[T, d] — broadcast over batch')}
+${shapeRow('Sum (block input)','[B, T, d]')}
+</div>
+<p>Positional encodings depend only on position, not on batch, so they broadcast across the <code>B</code> dimension. Shape is unchanged by the addition.</p>`)
++ step('numeric',`
+<p>With <code>d=4</code>, position <code>pos=1</code>:</p>
+<ul>
+<li>dim 0: sin(1 / 10000<sup>0</sup>) = sin(1) ≈ <strong>0.841</strong></li>
+<li>dim 1: cos(1 / 10000<sup>0</sup>) = cos(1) ≈ <strong>0.540</strong></li>
+<li>dim 2: sin(1 / 10000<sup>0.5</sup>) = sin(0.01) ≈ <strong>0.010</strong></li>
+<li>dim 3: cos(1 / 10000<sup>0.5</sup>) = cos(0.01) ≈ <strong>1.000</strong></li>
+</ul>
+<p>So PE(1) ≈ <code>[0.841, 0.540, 0.010, 1.000]</code>. This vector is <em>added</em> to token 1's embedding.</p>`)
++ step('code',`
+${codeBlock('positional.py',
+`import torch, math
+import torch.nn as nn
+
+# --- Option A: learned positional embedding (GPT-2 style) ---
+class GPTEmbed(nn.Module):
+    def __init__(self, V, d, max_len):
+        super().__init__()
+        self.tok = nn.Embedding(V, d)
+        self.pos = nn.Embedding(max_len, d)
+    def forward(self, ids):            # ids: [B, T]
+        B, T = ids.shape
+        positions = torch.arange(T, device=ids.device)   # [T]
+        return self.tok(ids) + self.pos(positions)        # [B, T, d]
+
+# --- Option B: fixed sinusoidal encoding (original Transformer) ---
+def sinusoidal(T, d):
+    pe = torch.zeros(T, d)
+    pos = torch.arange(T).unsqueeze(1)                    # [T, 1]
+    div = torch.exp(torch.arange(0, d, 2) * (-math.log(10000.0) / d))
+    pe[:, 0::2] = torch.sin(pos * div)   # even dims -> sin
+    pe[:, 1::2] = torch.cos(pos * div)   # odd  dims -> cos
+    return pe                            # [T, d]`)}`)
++ step('quiz',quizBlock([
+  {q:'Why does self-attention need positional information added explicitly?',
+   opts:['Softmax removes order','It is permutation-equivariant — the bare mechanism ignores order','Embeddings are too small','To save memory'],
+   a:1,why:'A weighted sum is order-invariant. Without position signals, "dog bites man" and "man bites dog" would be identical to the model.'},
+  {q:'In sinusoidal encoding, low (early) dimensions correspond to:',
+   opts:['High-frequency, fine position','Low-frequency, coarse position','Random noise','The token ID'],a:1,
+   why:'Wavelengths grow with dimension index, so early dims oscillate slowly (coarse) and later dims oscillate quickly (fine).'},
+  {q:'How is positional info combined with token embeddings?',
+   opts:['Concatenation always','Elementwise addition (same shape)','Matrix multiplication','Softmax'],a:1,
+   why:'Standard practice adds them: same shape [.,T,d], so the sum preserves dimension and overlays position onto meaning.'},
+  {q:'A key advantage of sinusoidal encodings over learned ones is:',
+   opts:['They are trainable','They can extrapolate to sequence lengths longer than seen in training','They use less precision','They remove the need for attention'],
+   a:1,why:'Because they are deterministic functions of position, they are defined for any position, even beyond the training length.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Concatenating instead of adding when the architecture expects addition — this changes <code>d</code> and breaks downstream shapes.</div>
+<div class="callout warn"><span class="h">Mistake</span>Indexing positions beyond <code>max_len</code> with learned embeddings → out-of-range error. Learned PEs don't extrapolate; sinusoidal ones do.</div>
+<div class="callout warn"><span class="h">Mistake</span>Believing modern LLMs still use vanilla sinusoidal/learned PE. Many now use <strong>RoPE</strong> (rotary) or ALiBi — same goal (inject order), different mechanism.</div>`);
+},
+init(){
+  // vector addition demo
+  const tok=[0.30,-0.10,0.60,0.10], pos=[0.841,0.540,0.010,1.000];
+  const tEl=document.getElementById('peTok'),pEl=document.getElementById('pePos'),sEl=document.getElementById('peSum');
+  if(tEl){
+    [tEl,pEl,sEl].forEach(e=>e.style.gridTemplateColumns='repeat(1,auto)');
+    tEl.innerHTML=tok.map(v=>`<div class="cell">${v.toFixed(2)}</div>`).join('');
+    pEl.innerHTML=pos.map(v=>`<div class="cell hlk">${v.toFixed(2)}</div>`).join('');
+    sEl.innerHTML=tok.map(()=>`<div class="cell" style="color:var(--ink-faint)">?</div>`).join('');
+    let k=0;
+    document.getElementById('peStep').onclick=()=>{
+      if(k>=4)return;
+      const cells=sEl.querySelectorAll('.cell');
+      cells[k].textContent=(tok[k]+pos[k]).toFixed(2);cells[k].classList.add('hlv');
+      tEl.querySelectorAll('.cell')[k].classList.add('hl');
+      pEl.querySelectorAll('.cell')[k].classList.add('hlk');k++;
+    };
+    document.getElementById('peReset').onclick=()=>{
+      k=0;sEl.innerHTML=tok.map(()=>`<div class="cell" style="color:var(--ink-faint)">?</div>`).join('');
+      tEl.querySelectorAll('.cell').forEach(c=>c.classList.remove('hl'));
+      pEl.querySelectorAll('.cell').forEach(c=>c.classList.remove('hlk'));
+    };
+  }
+  // sinusoidal canvas
+  const cv=document.getElementById('peCanvas');if(!cv)return;const ctx=cv.getContext('2d');
+  function pe(pos,i,d){const div=Math.exp(Math.floor(i/2)*2*(-Math.log(10000)/d));return (i%2===0)?Math.sin(pos*div):Math.cos(pos*div);}
+  function draw(){
+    const d=+document.getElementById('peDim').value, L=+document.getElementById('peLen').value;
+    document.getElementById('peDimV').textContent=d;document.getElementById('peLenV').textContent=L;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    const pad=36,W=cv.width-pad*2,H=cv.height-pad*2;
+    ctx.strokeStyle='#262d40';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad,pad+H/2);ctx.lineTo(pad+W,pad+H/2);ctx.stroke();
+    ctx.fillStyle='#6f7382';ctx.font='11px ui-monospace,monospace';ctx.textAlign='center';
+    ctx.fillText('position →',pad+W/2,cv.height-8);
+    const show=Math.min(d,8);
+    for(let i=0;i<show;i++){
+      const t=i/Math.max(1,show-1);const col=lerpColor([94,234,212],[242,166,90],t);
+      ctx.strokeStyle=`rgb(${col[0]},${col[1]},${col[2]})`;ctx.lineWidth=2;ctx.beginPath();
+      for(let p=0;p<L;p++){
+        const x=pad+(p/(L-1))*W;const y=pad+H/2 - pe(p,i,d)*(H/2-6);
+        if(p===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      }ctx.stroke();
+    }
+    ctx.fillStyle='#a7a899';ctx.textAlign='left';ctx.fillText('curves = embedding dims 0.. '+(show-1),pad,pad-12);
+  }
+  ['peDim','peLen'].forEach(id=>document.getElementById(id).oninput=draw);
+  draw();
+}
+});
+/* ===================== MODULE 4 ===================== */
+MODULES.push({
+id:'m4',num:'4',section:'Attention',title:'Self-Attention',
+render(){return header('4','Self-Attention',
+  'Q, K, V · scores · scaling · softmax · output',
+  'The central mechanism. Each token asks a question (Query), every token offers a label (Key) and content (Value). Matching question-to-label produces weights; those weights mix the values. This is how a token gathers context from the whole sequence in one parallel step.')
++ step('intuition',`
+<p>Think of a library. A token has a <em class="key">Query</em>: "I'm a verb, I need my subject." Every other token advertises a <em class="key">Key</em>: "I'm a noun," "I'm a determiner." The query is compared against all keys — high match = high attention. Then the token pulls in the <em class="key">Value</em> (the actual content) of whoever matched, weighted by how well they matched.</p>
+<p>Crucially, Q, K, and V are all <strong>learned linear projections of the same input</strong> X. That's why it's <em>self</em>-attention: the sequence attends to itself. The model learns three weight matrices that decide what counts as a good question, a good label, and useful content.</p>
+<div class="callout idea"><span class="h">One sentence</span><strong>Attention(Q,K,V) = softmax(QKᵀ / √d<sub>k</sub>) · V</strong> — compute pairwise match scores, scale, normalize to weights, then take a weighted average of the values.</div>`)
++ step('visual',`
+<p>The full pipeline for a toy example: <strong>3 tokens</strong>, model dim <strong>d=4</strong>, head dim <strong>d<sub>k</sub>=4</strong>. Step through each stage and watch the attention weights form as a heatmap (row = querying token, column = attended-to token).</p>
+<div class="card">
+<div id="attStageLabel" style="font-family:var(--mono);color:var(--amber-soft);margin-bottom:10px">Stage 0 — input X</div>
+<div id="attMatrices" class="matrix-stage"></div>
+<div class="canvas-wrap" id="attHeatWrap" style="display:none;text-align:center"><canvas id="attHeat" width="340" height="300" style="display:inline-block"></canvas></div>
+</div>
+<div class="btn-row"><button class="btn ghost" id="attPrev">◂ Back</button><button class="btn" id="attNext">Next stage ▸</button><span id="attStepNum" style="font-family:var(--mono);color:var(--ink-faint);align-self:center"></span></div>`)
++ step('math',`
+<p><strong>1. Project</strong> the input X ∈ ℝ<sup>n×d</sup> into queries, keys, values:</p>
+<div class="eq">Q <span class="op">=</span> X<span class="v">W<sub>Q</sub></span>,&nbsp;&nbsp; K <span class="op">=</span> X<span class="v">W<sub>K</sub></span>,&nbsp;&nbsp; V <span class="op">=</span> X<span class="v">W<sub>V</sub></span>&nbsp;&nbsp;<span class="small">W<sub>Q</sub>,W<sub>K</sub> ∈ ℝ<sup>d×d<sub>k</sub></sup>,&nbsp; W<sub>V</sub> ∈ ℝ<sup>d×d<sub>v</sub></sup></span></div>
+<p><strong>2. Score</strong> every query against every key with a dot product:</p>
+<div class="eq">S <span class="op">=</span> Q K<sup>⊤</sup> &nbsp;<span class="small">∈ ℝ<sup>n×n</sup> &nbsp; S<sub>ij</sub> = q<sub>i</sub>·k<sub>j</sub> = "how much token i attends to token j"</span></div>
+<p><strong>3. Scale</strong> by √d<sub>k</sub>:</p>
+<div class="eq">S' <span class="op">=</span> <span class="frac"><span class="top">QK<sup>⊤</sup></span><span class="bot">√d<sub>k</sub></span></span></div>
+<p><strong>4. Softmax</strong> each row → attention weights that sum to 1:</p>
+<div class="eq">A <span class="op">=</span> softmax(S')  <span class="small">row-wise</span></div>
+<p><strong>5. Weighted sum</strong> of values:</p>
+<div class="eq">Attention <span class="op">=</span> A V <span class="small">∈ ℝ<sup>n×d<sub>v</sub></sup></span></div>
+<h3>Why divide by √d<sub>k</sub>?</h3>
+<p>If q and k have components with variance 1, their dot product <code>q·k = Σ q<sub>m</sub>k<sub>m</sub></code> sums <code>d<sub>k</sub></code> terms and has variance ≈ <code>d<sub>k</sub></code>, so standard deviation ≈ <code>√d<sub>k</sub></code>. Large <code>d<sub>k</sub></code> → large-magnitude scores → softmax saturates into near-one-hot → gradients through softmax vanish. Dividing by <code>√d<sub>k</sub></code> rescales variance back to ≈ 1, keeping softmax in a responsive regime. <em>This is the single most-asked "why" in attention — it is a variance-stabilization trick.</em></p>`)
++ step('dims',`
+<p>Track shapes (single head, batch B, sequence n, model dim d, head dims d<sub>k</sub>=d<sub>v</sub>):</p>
+<div class="shape-flow">
+${shapeRow('X (input)','[B, n, d]')}
+${shapeRow('W_Q, W_K','[d, d_k]')}
+${shapeRow('W_V','[d, d_v]')}
+${shapeRow('Q = X W_Q','[B, n, d_k]')}
+${shapeRow('K = X W_K','[B, n, d_k]')}
+${shapeRow('V = X W_V','[B, n, d_v]')}
+${shapeRow('scores S = Q Kᵀ','[B, n, n]')}
+${shapeRow('weights A = softmax(S/√d_k)','[B, n, n]')}
+${shapeRow('output = A V','[B, n, d_v]')}
+</div>
+<div class="callout"><span class="h">Shape rule of thumb</span>The score matrix is always <span class="shape-pill">[n, n]</span> (a token-by-token grid). The output matches the value dimension and sequence length: <span class="shape-pill">[n, d_v]</span>.</div>`)
++ step('numeric',`
+<p>One concrete row of softmax. Suppose token 1's scaled scores against the three tokens are <code>[2.0, 1.0, 0.0]</code>. Then:</p>
+<div class="eq">softmax([2,1,0]) = [ e²,&nbsp; e¹,&nbsp; e⁰ ] / (e²+e¹+e⁰)</div>
+<p>= <code>[7.389, 2.718, 1.000] / 11.107</code> = <strong>[0.665, 0.245, 0.090]</strong>. These sum to 1.</p>
+<p>The output for token 1 is then <code>0.665·v₁ + 0.245·v₂ + 0.090·v₃</code> — it mostly copies its own value but mixes in some of token 2. The interactive above uses exactly this kind of computation on real toy numbers.</p>`)
++ step('code',`
+${codeBlock('self_attention.py',
+`import torch, math
+import torch.nn as nn
+import torch.nn.functional as F
+
+class SelfAttention(nn.Module):
+    def __init__(self, d_model, d_k):
+        super().__init__()
+        self.Wq = nn.Linear(d_model, d_k, bias=False)
+        self.Wk = nn.Linear(d_model, d_k, bias=False)
+        self.Wv = nn.Linear(d_model, d_k, bias=False)
+        self.d_k = d_k
+
+    def forward(self, x):                  # x: [B, n, d_model]
+        Q = self.Wq(x)                     # [B, n, d_k]
+        K = self.Wk(x)                     # [B, n, d_k]
+        V = self.Wv(x)                     # [B, n, d_k]
+        scores = Q @ K.transpose(-2, -1)   # [B, n, n]
+        scores = scores / math.sqrt(self.d_k)   # scale
+        attn = F.softmax(scores, dim=-1)   # [B, n, n], rows sum to 1
+        out = attn @ V                     # [B, n, d_k]
+        return out, attn`)}
+<div class="explain-row">
+<div class="ln"><b>nn.Linear(d_model, d_k, bias=False)</b> — this IS W_Q (its weight is the projection matrix). No bias, matching the standard formulation.</div>
+<div class="ln"><b>K.transpose(-2, -1)</b> — swaps the last two dims so [B,n,d_k] becomes [B,d_k,n], making Q@Kᵀ valid → [B,n,n].</div>
+<div class="ln"><b>/ math.sqrt(self.d_k)</b> — the variance-stabilizing scale. Omit it and training becomes unstable for large d_k.</div>
+<div class="ln"><b>F.softmax(scores, dim=-1)</b> — normalize over the <em>last</em> dim (the keys), so each query's weights sum to 1.</div>
+<div class="ln"><b>attn @ V</b> — weighted average of value vectors; returns the context-aware output.</div>
+</div>`)
++ step('quiz',quizBlock([
+  {q:'In Attention = softmax(QKᵀ/√d_k)V, what does the QKᵀ product represent?',
+   opts:['The output vectors','Pairwise similarity scores between every query and every key','The embedding matrix','The positional encodings'],
+   a:1,why:'QKᵀ is an n×n grid where entry (i,j) is the dot-product match between token i\'s query and token j\'s key.'},
+  {q:'Softmax is applied along which dimension?',
+   opts:['Over the batch','Over the queries (rows)','Over the keys (last dim), so each query\'s weights sum to 1','Over d_k'],
+   a:2,why:'dim=-1 normalizes across keys, turning each row of scores into a probability distribution over which tokens to attend to.'},
+  {q:'Why divide scores by √d_k before softmax?',
+   opts:['To make them positive','To keep dot-product variance ≈1 so softmax stays responsive and gradients don\'t vanish','To save memory','To enforce causality'],
+   a:1,why:'Dot products of d_k unit-variance components have variance ≈ d_k; the √d_k divisor rescales them, preventing softmax saturation.'},
+  {q:'The output of single-head attention has shape:',
+   opts:['[B, n, n]','[B, n, d_v]','[B, d_v]','[d, d_k]'],a:1,
+   why:'A·V multiplies [B,n,n] by [B,n,d_v] → [B,n,d_v]: one context vector per token, of value-dimension size.'},
+  {q:'Q, K, and V in self-attention come from:',
+   opts:['Three different sequences','The same input X, via three learned projection matrices','Random noise','The positional encodings'],
+   a:1,why:'All three are linear projections of the same X — that "self" reference is what makes it self-attention.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Softmax over the wrong axis (dim=-2 instead of -1). Then weights sum to 1 across queries, not keys — silently wrong, no error thrown.</div>
+<div class="callout warn"><span class="h">Mistake</span>Forgetting the √d_k scale. Training "works" but is unstable / slow to converge, especially as d_k grows.</div>
+<div class="callout warn"><span class="h">Mistake</span>Transposing the wrong dimensions of K in a batched tensor, e.g. <code>K.T</code> on a 3-D tensor. Use <code>transpose(-2,-1)</code>.</div>
+<div class="callout warn"><span class="h">Mistake</span>Thinking attention "selects one token". Softmax is soft — it blends many tokens by weight, not a hard pick.</div>`);
+},
+init(){
+  // toy deterministic attention, n=3, d=4
+  const X=[[1,0,1,0],[0,2,0,1],[1,1,0,1]];
+  const Wq=[[0.5,0,0,0.5],[0,0.5,0.5,0],[0.5,0,0,0.5],[0,0.5,0.5,0]];
+  const Wk=[[0,0.5,0.5,0],[0.5,0,0,0.5],[0,0.5,0.5,0],[0.5,0,0,0.5]];
+  const Wv=[[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]];
+  function matmul(A,B){const n=A.length,m=B[0].length,p=B.length;const C=[];for(let i=0;i<n;i++){C.push([]);for(let j=0;j<m;j++){let s=0;for(let k=0;k<p;k++)s+=A[i][k]*B[k][j];C[i].push(s);}}return C;}
+  const Q=matmul(X,Wq),K=matmul(X,Wk),V=matmul(X,Wv);
+  const Kt=K[0].map((_,j)=>K.map(r=>r[j]));
+  const S=matmul(Q,Kt);const dk=4;
+  const Ss=S.map(r=>r.map(v=>v/Math.sqrt(dk)));
+  const A=Ss.map(softmaxRow);
+  const O=matmul(A,V);
+  const round=g=>g.map(r=>r.map(x=>(+x).toFixed(2)));
+  const stages=[
+    {label:'Stage 0 — input X (3 tokens × d=4)',heat:false,mats:[['X','[3, 4]',round(X)]]},
+    {label:'Stage 1 — project to Q, K, V',heat:false,mats:[['Q','[3, 4]',round(Q)],['K','[3, 4]',round(K)],['V','[3, 4]',round(V)]]},
+    {label:'Stage 2 — scores S = Q·Kᵀ  (3×3)',heat:false,mats:[['S = QKᵀ','[3, 3]',round(S)]]},
+    {label:'Stage 3 — scaled by √d_k = 2',heat:false,mats:[["S' = S/√d_k","[3, 3]",round(Ss)]]},
+    {label:'Stage 4 — softmax(rows) → attention weights A',heat:true,heatData:A,mats:[['A','[3, 3]',round(A)]]},
+    {label:'Stage 5 — output = A·V  (context vectors)',heat:false,mats:[['output','[3, 4]',round(O)]]},
+  ];
+  let s=0;const lab=document.getElementById('attStageLabel'),mEl=document.getElementById('attMatrices'),
+    hw=document.getElementById('attHeatWrap'),num=document.getElementById('attStepNum');
+  if(!lab)return;
+  function render(){
+    const st=stages[s];lab.textContent=st.label;num.textContent=`stage ${s} / ${stages.length-1}`;
+    let html='';st.mats.forEach((m,i)=>{if(i>0)html+='<div class="mat-op">·</div>';html+=matrix(m[0],m[1],m[2]);});
+    mEl.innerHTML=html;
+    if(st.heat){hw.style.display='block';drawHeatmap(document.getElementById('attHeat'),st.heatData,{rowLabels:['q:t1','q:t2','q:t3'],colLabels:['t1','t2','t3']});}
+    else hw.style.display='none';
+  }
+  render();
+  document.getElementById('attNext').onclick=()=>{s=Math.min(stages.length-1,s+1);render();};
+  document.getElementById('attPrev').onclick=()=>{s=Math.max(0,s-1);render();};
+}
+});
+
+/* ===================== MODULE 5 ===================== */
+MODULES.push({
+id:'m5',num:'5',section:'Attention',title:'Causal Masking',
+render(){return header('5','Causal Masking',
+  'why GPT cannot peek at the future',
+  'GPT is trained to predict the next token. If a token could attend to tokens that come after it, it would simply read the answer — cheating. Causal masking blocks every token from attending to any future position.')
++ step('intuition',`
+<p>During training we show the model the whole sentence at once for efficiency, and ask it to predict each next token <em>in parallel</em>. But that creates a leak: when predicting the word at position 3, the model must not be allowed to look at positions 4, 5, … — those contain the future it's supposed to guess.</p>
+<p>The fix is elegant: before softmax, set the score for any "future" position to <strong>−∞</strong>. After softmax, <code>e<sup>−∞</sup> = 0</code>, so future tokens receive exactly zero attention weight. Each token can only attend to itself and the tokens before it — a lower-triangular pattern.</p>`)
++ step('visual',`
+<p>Sentence: <code>"The cat sat"</code>. Toggle the mask and watch the upper triangle (future) get blocked, then re-normalized by softmax. Rows are the querying token; columns are what it's allowed to look at.</p>
+<div class="btn-row"><button class="btn" id="maskToggle">Apply causal mask ▸</button><span id="maskState" style="font-family:var(--mono);color:var(--ink-faint);align-self:center">currently: <b style="color:var(--teal)">unmasked</b></span></div>
+<div style="display:flex;gap:30px;flex-wrap:wrap;justify-content:center">
+<div style="text-align:center"><div style="font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-bottom:6px">attention weights</div><canvas id="maskHeat" width="320" height="300"></canvas></div>
+</div>
+<div class="legend"><span><span class="sw" style="background:#1c2130;border:1px solid #323b54"></span>blocked (−∞ → 0)</span><span><span class="sw" style="background:#f2a65a"></span>high weight</span><span><span class="sw" style="background:#12282e"></span>low weight</span></div>`)
++ step('math',`
+<p>Apply an additive mask M before softmax, where M<sub>ij</sub> = 0 if token i may attend to j, and −∞ otherwise:</p>
+<div class="eq">A <span class="op">=</span> softmax( <span class="frac"><span class="top">QK<sup>⊤</sup></span><span class="bot">√d<sub>k</sub></span></span> <span class="op">+</span> M )</div>
+<p>For causal (autoregressive) attention, M is strictly upper-triangular −∞:</p>
+<div class="eq">M <span class="op">=</span> [ [0, −∞, −∞], [0, 0, −∞], [0, 0, 0] ]</div>
+<p>Because softmax exponentiates, adding −∞ sends those entries to <code>e<sup>−∞</sup>=0</code>. The remaining (allowed) weights still sum to 1 — softmax re-normalizes automatically over only the visible tokens.</p>`)
++ step('dims',`
+<div class="shape-flow">
+${shapeRow('scores QKᵀ/√d_k','[B, n, n]')}
+${shapeRow('causal mask','[n, n] lower-triangular (broadcast)')}
+${shapeRow('masked scores','[B, n, n]')}
+${shapeRow('weights (rows sum to 1 over visible)','[B, n, n]')}
+</div>`)
++ step('numeric',`
+<p>Token 2 ("cat") has raw scores <code>[1.0, 2.0, 3.0]</code> over ["The","cat","sat"]. Position 3 ("sat") is the future, so we mask it:</p>
+<div class="eq">masked = [1.0, 2.0, −∞]</div>
+<p>softmax([1, 2, −∞]) = <code>[e¹, e², 0]/(e¹+e²)</code> = <code>[2.718, 7.389, 0]/10.107</code> = <strong>[0.269, 0.731, 0.000]</strong>. The future token "sat" gets exactly 0; the visible weights still sum to 1.</p>`)
++ step('code',`
+${codeBlock('causal_mask.py',
+`import torch, torch.nn.functional as F
+
+def causal_attention(Q, K, V):           # each [B, n, d_k]
+    n = Q.size(-2)
+    scores = Q @ K.transpose(-2, -1) / Q.size(-1) ** 0.5   # [B, n, n]
+
+    # lower-triangular ones; True = keep, we mask where it's False
+    mask = torch.tril(torch.ones(n, n, device=Q.device)).bool()
+    scores = scores.masked_fill(~mask, float('-inf'))      # future -> -inf
+
+    attn = F.softmax(scores, dim=-1)     # future positions become exactly 0
+    return attn @ V, attn
+
+# Often the mask is registered once as a buffer for efficiency:
+# self.register_buffer("mask", torch.tril(torch.ones(max_n, max_n)))`)}
+<div class="explain-row">
+<div class="ln"><b>torch.tril(ones(n,n))</b> — a lower-triangular matrix of 1s: row i has 1s in columns 0..i (itself and the past).</div>
+<div class="ln"><b>masked_fill(~mask, -inf)</b> — wherever mask is False (the upper triangle = future), overwrite the score with −∞.</div>
+<div class="ln"><b>softmax</b> — −∞ → 0 after exponentiation, so each token attends only to itself and earlier tokens.</div>
+</div>`)
++ step('quiz',quizBlock([
+  {q:'Why does a GPT-style (decoder) model use a causal mask?',
+   opts:['To save memory','To prevent each position from attending to future tokens it is meant to predict','To speed up softmax','To normalize embeddings'],
+   a:1,why:'Next-token prediction would be trivially solvable if a token could see the future. The mask enforces autoregressive honesty.'},
+  {q:'The mask value added to future positions before softmax is:',
+   opts:['0','1','−∞ (a very large negative number)','the position index'],a:2,
+   why:'Adding −∞ makes e^(score) = 0 after softmax, zeroing the weight on future tokens while leaving visible ones intact.'},
+  {q:'After masking, the attention weights in each row:',
+   opts:['No longer sum to 1','Still sum to 1, but only over visible (past + current) tokens','Are all equal','Become negative'],
+   a:1,why:'Softmax re-normalizes over the non-masked entries, so visible weights always sum to 1.'},
+  {q:'The causal mask matrix is:',
+   opts:['Upper-triangular ones','Lower-triangular (each token sees itself and earlier)','Diagonal only','All ones'],
+   a:1,why:'Lower-triangular: row i keeps columns 0..i, blocking everything strictly after position i.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Using 0 instead of −∞ for the mask. Adding 0 does nothing; you must add a large negative value <em>before</em> softmax.</div>
+<div class="callout warn"><span class="h">Mistake</span>Masking <em>after</em> softmax. Zeroing post-softmax breaks the "sums to 1" property — mask the scores, not the weights.</div>
+<div class="callout warn"><span class="h">Mistake</span>Applying a causal mask in an encoder (e.g. BERT). Encoders are bidirectional — only decoders/GPT need causality.</div>`);
+},
+init(){
+  const cv=document.getElementById('maskHeat');if(!cv)return;
+  const raw=[[2.0,0,0],[1.0,2.0,0],[0.5,1.5,2.5]]; // pre-fill lower with values; we will compute both
+  // base scores (symmetric-ish)
+  const scores=[[2.0,1.0,0.5],[1.0,2.5,1.5],[0.5,1.5,3.0]];
+  let masked=false;
+  function compute(){
+    const rows=scores.map((r,i)=>{
+      const m=r.map((v,j)=> (masked && j>i)? -Infinity : v);
+      const sm=softmaxRow(m);
+      return sm.map((v,j)=>(masked&&j>i)?null:v);
+    });
+    return rows;
+  }
+  function render(){
+    drawHeatmap(cv,compute(),{rowLabels:['The','cat','sat'],colLabels:['The','cat','sat']});
+    document.getElementById('maskState').innerHTML=`currently: <b style="color:${masked?'var(--rose)':'var(--teal)'}">${masked?'causal-masked':'unmasked'}</b>`;
+    document.getElementById('maskToggle').textContent=masked?'Remove mask ◂':'Apply causal mask ▸';
+  }
+  render();
+  document.getElementById('maskToggle').onclick=()=>{masked=!masked;render();};
+}
+});
+
+/* ===================== MODULE 6 ===================== */
+MODULES.push({
+id:'m6',num:'6',section:'Attention',title:'Multi-Head Attention',
+render(){return header('6','Multi-Head Attention',
+  'many attention patterns in parallel · concat · project',
+  'One attention head can only learn one "way of looking". Multi-head attention runs several heads in parallel, each with its own Q/K/V projections, so the model can simultaneously track syntax, coreference, position, and more — then merges them.')
++ step('intuition',`
+<p>A single head produces one attention pattern per token. But language needs many relationships at once: a verb wants its subject <em>and</em> its object; a pronoun wants its antecedent; a word wants its neighbors. Forcing all of that through one head is a bottleneck.</p>
+<p><strong>Multi-head attention</strong> splits the model dimension into <code>h</code> heads. Each head gets its own small Q/K/V projections (dimension <code>d<sub>k</sub> = d/h</code>), attends independently, and learns a distinct specialty. The heads' outputs are concatenated and passed through a final linear projection that lets the model combine what every head found.</p>
+<div class="callout idea"><span class="h">Key efficiency</span>Heads don't add compute: we split d into h pieces, so h heads of size d/h cost about the same as one head of size d — but with far richer, more diverse attention patterns.</div>`)
++ step('visual',`
+<p>Four heads attending over the same 4 tokens — each learns a different pattern (here: previous-token, self-focus, first-token "sink", and broad/diffuse). Real heads discover these automatically during training.</p>
+<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:18px;max-width:560px;margin:14px auto">
+<div style="text-align:center"><div style="font-family:var(--mono);font-size:12px;color:var(--amber-soft)">Head 1 · "look back"</div><canvas id="mh1" width="240" height="220"></canvas></div>
+<div style="text-align:center"><div style="font-family:var(--mono);font-size:12px;color:var(--amber-soft)">Head 2 · "self / local"</div><canvas id="mh2" width="240" height="220"></canvas></div>
+<div style="text-align:center"><div style="font-family:var(--mono);font-size:12px;color:var(--amber-soft)">Head 3 · "first-token sink"</div><canvas id="mh3" width="240" height="220"></canvas></div>
+<div style="text-align:center"><div style="font-family:var(--mono);font-size:12px;color:var(--amber-soft)">Head 4 · "diffuse"</div><canvas id="mh4" width="240" height="220"></canvas></div>
+</div>`)
++ step('math',`
+<p>For head <code>i</code> with its own projections:</p>
+<div class="eq">head<sub>i</sub> <span class="op">=</span> Attention( X<span class="v">W<sub>Q</sub><sup>i</sup></span>, X<span class="v">W<sub>K</sub><sup>i</sup></span>, X<span class="v">W<sub>V</sub><sup>i</sup></span> ) &nbsp;<span class="small">∈ ℝ<sup>n×d<sub>k</sub></sup>, d<sub>k</sub>=d/h</span></div>
+<p>Concatenate all heads along the feature dimension, then project:</p>
+<div class="eq">MultiHead <span class="op">=</span> Concat(head<sub>1</sub>,…,head<sub>h</sub>) <span class="v">W<sub>O</sub></span> &nbsp;<span class="small">W<sub>O</sub> ∈ ℝ<sup>d×d</sup></span></div>
+<p>In practice we don't loop over heads: one big Q/K/V projection produces <code>[n, d]</code>, which we <em>reshape</em> into <code>[h, n, d<sub>k</sub>]</code> and run attention in parallel across the head axis.</p>`)
++ step('dims',`
+<p>With model dim d, h heads, head dim d<sub>k</sub> = d/h:</p>
+<div class="shape-flow">
+${shapeRow('X','[B, n, d]')}
+${shapeRow('Q,K,V (one big proj)','[B, n, d]')}
+${shapeRow('reshape to heads','[B, h, n, d_k]')}
+${shapeRow('per-head scores','[B, h, n, n]')}
+${shapeRow('per-head output','[B, h, n, d_k]')}
+${shapeRow('concat (merge heads)','[B, n, d]')}
+${shapeRow('output projection W_O','[B, n, d]')}
+</div>
+<div class="callout"><span class="h">Invariant</span>Multi-head attention is shape-preserving: input <span class="shape-pill">[B, n, d]</span> → output <span class="shape-pill">[B, n, d]</span>. That's what lets you stack blocks.</div>`)
++ step('numeric',`
+<p>Concrete sizes for GPT-2 small: <code>d = 768</code>, <code>h = 12</code>, so each head has <code>d<sub>k</sub> = 768/12 = 64</code>. Twelve 64-dim heads run in parallel; their outputs concatenate back to <code>12 × 64 = 768</code>, and <code>W<sub>O</sub></code> (768×768) mixes them. Total attention params ≈ 4 × 768² (the four 768×768 matrices Q,K,V,O).</p>`)
++ step('code',`
+${codeBlock('multi_head.py',
+`import torch, math
+import torch.nn as nn
+import torch.nn.functional as F
+
+class MultiHeadAttention(nn.Module):
+    def __init__(self, d_model, n_heads):
+        super().__init__()
+        assert d_model % n_heads == 0
+        self.h = n_heads
+        self.d_k = d_model // n_heads
+        self.qkv = nn.Linear(d_model, 3 * d_model)   # one big projection
+        self.proj = nn.Linear(d_model, d_model)      # W_O
+
+    def forward(self, x, mask=None):                 # x: [B, n, d]
+        B, n, d = x.shape
+        qkv = self.qkv(x)                            # [B, n, 3d]
+        q, k, v = qkv.chunk(3, dim=-1)               # each [B, n, d]
+        # split into heads: [B, n, h, d_k] -> [B, h, n, d_k]
+        q = q.view(B, n, self.h, self.d_k).transpose(1, 2)
+        k = k.view(B, n, self.h, self.d_k).transpose(1, 2)
+        v = v.view(B, n, self.h, self.d_k).transpose(1, 2)
+
+        scores = q @ k.transpose(-2, -1) / math.sqrt(self.d_k)  # [B,h,n,n]
+        if mask is not None:
+            scores = scores.masked_fill(mask == 0, float('-inf'))
+        attn = F.softmax(scores, dim=-1)
+        out = attn @ v                               # [B, h, n, d_k]
+        # merge heads back: [B, n, h, d_k] -> [B, n, d]
+        out = out.transpose(1, 2).contiguous().view(B, n, d)
+        return self.proj(out)                        # [B, n, d]`)}
+<div class="explain-row">
+<div class="ln"><b>nn.Linear(d, 3*d)</b> — computes Q, K, V together for speed; <code>.chunk(3)</code> splits them.</div>
+<div class="ln"><b>view(...).transpose(1,2)</b> — reshapes [B,n,d] into [B,h,n,d_k] so the head axis is independent and attention runs in parallel across it.</div>
+<div class="ln"><b>contiguous().view(B,n,d)</b> — after attention, glue heads back together along the feature dim before the output projection.</div>
+<div class="ln"><b>self.proj</b> — W_O: lets the model mix information across heads. Without it, heads stay siloed.</div>
+</div>`)
++ step('quiz',quizBlock([
+  {q:'Why use multiple attention heads instead of one large head?',
+   opts:['To reduce parameters','So different heads can specialize in different relationship types simultaneously','To avoid softmax','Heads are required by PyTorch'],
+   a:1,why:'Each head learns a distinct attention pattern (syntax, coreference, locality...), giving the layer richer representational capacity.'},
+  {q:'If d_model=512 and n_heads=8, each head\'s dimension d_k is:',
+   opts:['512','8','64','4096'],a:2,why:'d_k = d_model / n_heads = 512/8 = 64. The model dimension is split, not multiplied.'},
+  {q:'What is the role of the output projection W_O?',
+   opts:['It applies the mask','It mixes the concatenated head outputs into a unified representation','It computes the scores','It adds positional encoding'],
+   a:1,why:'After concatenation, W_O lets information flow between heads; otherwise each head\'s output occupies a separate slice with no interaction.'},
+  {q:'Multi-head attention maps an input of shape [B, n, d] to:',
+   opts:['[B, n, d] (shape-preserving)','[B, h, n, d]','[B, n, h]','[B, d, d]'],a:0,
+   why:'Heads are split internally then merged; the layer is shape-preserving so blocks can be stacked.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Choosing n_heads that doesn't divide d_model. Reshaping into heads then fails — they must divide evenly.</div>
+<div class="callout warn"><span class="h">Mistake</span>Forgetting <code>.contiguous()</code> before <code>.view()</code> after a transpose — PyTorch raises an error because memory isn't laid out contiguously.</div>
+<div class="callout warn"><span class="h">Mistake</span>Omitting the output projection W_O. The model loses the ability to combine heads, hurting quality.</div>
+<div class="callout warn"><span class="h">Mistake</span>Believing more heads is always better. Past a point, heads become tiny (small d_k) and individually weak; it's a trade-off.</div>`);
+},
+init(){
+  const patterns={
+    mh1:[[1,0,0,0],[0.1,0.9,0,0],[0,0.2,0.8,0],[0,0,0.25,0.75]], // look back / prev
+    mh2:[[0.85,0.15,0,0],[0.1,0.8,0.1,0],[0,0.1,0.8,0.1],[0,0,0.15,0.85]], // local/self
+    mh3:[[1,0,0,0],[0.7,0.3,0,0],[0.6,0.1,0.3,0],[0.55,0.1,0.1,0.25]], // first-token sink
+    mh4:[[0.4,0.3,0.2,0.1],[0.25,0.3,0.25,0.2],[0.2,0.25,0.3,0.25],[0.15,0.2,0.3,0.35]] // diffuse
+  };
+  const labels=['t1','t2','t3','t4'];
+  Object.keys(patterns).forEach(id=>{const c=document.getElementById(id);if(c)drawHeatmap(c,patterns[id],{rowLabels:labels,colLabels:labels,pad:30});});
+}
+});
+/* ===================== MODULE 7 ===================== */
+MODULES.push({
+id:'m7',num:'7',section:'The Block',title:'LayerNorm',
+render(){return header('7','Layer Normalization',
+  'mean · variance · normalize · learnable scale & shift',
+  'Deep networks become unstable when activations drift to wildly different scales across layers. LayerNorm re-centers and re-scales each token\'s feature vector to a clean distribution, then lets the model re-scale it with learnable parameters.')
++ step('intuition',`
+<p>As signals pass through many layers, their magnitudes can grow or shrink unpredictably. That makes optimization a moving target. <strong>LayerNorm</strong> standardizes each token's vector independently: subtract its mean, divide by its standard deviation, so every token's features have mean 0 and variance 1.</p>
+<p>Then two learnable parameters — <em class="key">γ</em> (scale) and <em class="key">β</em> (shift) — let the network undo or reshape the normalization if that helps. So normalization stabilizes training without forcing the representation into a rigid form.</p>
+<p>Unlike BatchNorm, LayerNorm normalizes <strong>over the feature dimension of a single token</strong>, not across the batch. This makes it independent of batch size and well-suited to variable-length sequences — exactly what Transformers need.</p>`)
++ step('visual',`
+<p>Interactive calculator. Enter a token's feature vector; watch mean, variance, and the normalized output update live.</p>
+<div class="card">
+<div class="control" style="flex-direction:row;align-items:center;gap:10px"><label>vector x =</label>
+<input type="text" id="lnInput" value="2, 4, 4, 4, 5, 5, 7, 9" style="font-family:var(--mono);background:var(--bg2);border:1px solid var(--line2);color:var(--teal);padding:8px 12px;border-radius:8px;width:280px"></div>
+<div id="lnOut" style="margin-top:14px;font-family:var(--mono);font-size:13px;line-height:2"></div>
+</div>`)
++ step('math',`
+<p>For a feature vector <code>x ∈ ℝ<sup>d</sup></code> (one token):</p>
+<div class="eq">μ <span class="op">=</span> <span class="frac"><span class="top">1</span><span class="bot">d</span></span> Σ<sub>i</sub> x<sub>i</sub> &nbsp;&nbsp;&nbsp; σ² <span class="op">=</span> <span class="frac"><span class="top">1</span><span class="bot">d</span></span> Σ<sub>i</sub> (x<sub>i</sub> − μ)²</div>
+<div class="eq">x̂<sub>i</sub> <span class="op">=</span> <span class="frac"><span class="top">x<sub>i</sub> − μ</span><span class="bot">√(σ² + ε)</span></span> &nbsp;&nbsp;&nbsp; y<sub>i</sub> <span class="op">=</span> <span class="v">γ<sub>i</sub></span> x̂<sub>i</sub> <span class="op">+</span> <span class="v">β<sub>i</sub></span></div>
+<p><code>ε</code> (e.g. 1e-5) prevents division by zero. <code>γ</code> and <code>β</code> are length-<code>d</code> learnable vectors (one per feature). At init, γ=1, β=0 → pure normalization.</p>`)
++ step('dims',`
+<div class="shape-flow">
+${shapeRow('input','[B, n, d]')}
+${shapeRow('μ, σ² (over last dim)','[B, n, 1]')}
+${shapeRow('normalized x̂','[B, n, d]')}
+${shapeRow('γ, β (learnable)','[d]')}
+${shapeRow('output','[B, n, d]')}
+</div>
+<p>Statistics are computed over the <strong>last dimension only</strong> (the <code>d</code> features), independently for each (batch, position) pair. Shape is preserved.</p>`)
++ step('numeric',`
+<p>Take <code>x = [2, 4, 6, 8]</code>, d=4:</p>
+<ul>
+<li>μ = (2+4+6+8)/4 = <strong>5</strong></li>
+<li>deviations: [−3, −1, 1, 3]; squares: [9,1,1,9]; σ² = 20/4 = <strong>5</strong>, σ ≈ 2.236</li>
+<li>x̂ = [−3, −1, 1, 3]/2.236 = <strong>[−1.342, −0.447, 0.447, 1.342]</strong></li>
+</ul>
+<p>With γ=1, β=0, that's the output. Mean is now 0, variance 1.</p>`)
++ step('code',`
+${codeBlock('layernorm.py',
+`import torch
+import torch.nn as nn
+
+class LayerNorm(nn.Module):
+    def __init__(self, d, eps=1e-5):
+        super().__init__()
+        self.gamma = nn.Parameter(torch.ones(d))    # learnable scale
+        self.beta  = nn.Parameter(torch.zeros(d))   # learnable shift
+        self.eps = eps
+
+    def forward(self, x):                            # x: [B, n, d]
+        mean = x.mean(dim=-1, keepdim=True)          # [B, n, 1]
+        var  = x.var(dim=-1, keepdim=True, unbiased=False)
+        xhat = (x - mean) / torch.sqrt(var + self.eps)
+        return self.gamma * xhat + self.beta
+
+# In practice: nn.LayerNorm(d) does exactly this.`)}
+<div class="explain-row">
+<div class="ln"><b>dim=-1, keepdim=True</b> — normalize over features only; keepdim keeps shape broadcastable for the subtraction.</div>
+<div class="ln"><b>unbiased=False</b> — divide by d (not d−1), matching the LayerNorm definition.</div>
+<div class="ln"><b>nn.Parameter</b> — registers γ, β as trainable; they receive gradients like any weight.</div>
+</div>`)
++ step('quiz',quizBlock([
+  {q:'LayerNorm computes its statistics over which dimension?',
+   opts:['The batch dimension','The feature (last) dimension, per token','The sequence dimension','All dimensions at once'],
+   a:1,why:'It normalizes each token\'s feature vector independently, which is why it doesn\'t depend on batch size.'},
+  {q:'What do the learnable parameters γ and β allow?',
+   opts:['They mask future tokens','They let the model rescale/shift the normalized output, even undoing normalization if useful','They compute attention','They reduce dimension'],
+   a:1,why:'Normalization fixes a distribution; γ (scale) and β (shift) give the model freedom to adapt it.'},
+  {q:'Why is ε added inside the square root?',
+   opts:['To add noise','To prevent division by zero when variance is tiny','To increase the mean','To enforce causality'],
+   a:1,why:'If σ²≈0, dividing would explode; ε (≈1e-5) keeps the denominator safely positive.'},
+  {q:'A key advantage of LayerNorm over BatchNorm for Transformers is:',
+   opts:['It is faster on CPU','It is independent of batch size and handles variable-length sequences','It removes the need for attention','It uses fewer parameters than no normalization'],
+   a:1,why:'Per-token normalization means behavior doesn\'t change with batch size — ideal for sequences and inference with batch size 1.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Normalizing over the wrong dimension (batch instead of features) — that's BatchNorm behavior and breaks the per-token guarantee.</div>
+<div class="callout warn"><span class="h">Mistake</span>Using <code>unbiased=True</code> (dividing by d−1). Standard LayerNorm uses the biased variance (divide by d).</div>
+<div class="callout warn"><span class="h">Mistake</span>Confusing pre-norm vs post-norm placement. Modern GPTs use <em>pre-norm</em> (LayerNorm before the sublayer) for more stable deep training — see Module 10.</div>`);
+},
+init(){
+  const inp=document.getElementById('lnInput'),out=document.getElementById('lnOut');if(!inp)return;
+  function calc(){
+    const x=inp.value.split(',').map(s=>parseFloat(s.trim())).filter(v=>!isNaN(v));
+    if(x.length<2){out.innerHTML='<span style="color:var(--rose)">enter at least 2 numbers</span>';return;}
+    const mu=x.reduce((a,b)=>a+b,0)/x.length;
+    const v=x.reduce((a,b)=>a+(b-mu)**2,0)/x.length;
+    const sd=Math.sqrt(v+1e-5);
+    const xh=x.map(xi=>(xi-mu)/sd);
+    out.innerHTML=
+     `<div>μ (mean) = <b style="color:var(--amber-soft)">${mu.toFixed(4)}</b></div>`+
+     `<div>σ² (variance) = <b style="color:var(--amber-soft)">${v.toFixed(4)}</b> &nbsp; σ = ${sd.toFixed(4)}</div>`+
+     `<div style="margin-top:8px;color:var(--ink-faint)">normalized (γ=1, β=0):</div>`+
+     `<div style="color:var(--teal)">[ ${xh.map(z=>z.toFixed(3)).join(', ')} ]</div>`+
+     `<div style="margin-top:8px;color:var(--ink-faint)">check → mean=${(xh.reduce((a,b)=>a+b,0)/xh.length).toFixed(3)}, var≈${(xh.reduce((a,b)=>a+b*b,0)/xh.length).toFixed(3)}</div>`;
+  }
+  inp.oninput=calc;calc();
+}
+});
+
+/* ===================== MODULE 8 ===================== */
+MODULES.push({
+id:'m8',num:'8',section:'The Block',title:'Residual Connections',
+render(){return header('8','Residual Connections',
+  'x + f(x) · the gradient highway',
+  'Stacking dozens of layers normally makes gradients vanish before they reach the early layers. Residual (skip) connections add the input back to the output, giving gradients a direct path and letting each layer learn only a small correction.')
++ step('intuition',`
+<p>Without skips, a 48-layer network forces the gradient to survive 48 multiplications on its way back — it usually decays to nothing, and early layers stop learning. With a residual connection, the layer computes <code>x + f(x)</code> instead of <code>f(x)</code>: the original input is carried forward unchanged.</p>
+<p>Two payoffs:</p>
+<ul>
+<li><strong>Gradient highway</strong> — the <code>+x</code> term means the gradient has a path that is multiplied by 1, so it reaches early layers undiminished.</li>
+<li><strong>Easy identity</strong> — if a layer is unhelpful, it can learn <code>f(x)≈0</code> and just pass <code>x</code> through. Each block only needs to learn a <em>residual</em> (a correction), which is easier than learning a full transformation from scratch.</li>
+</ul>`)
++ step('visual',`
+<p>Toggle residual connections and watch a gradient signal flow backward through 6 stacked layers. Without skips it fades; with skips it stays strong all the way to layer 1.</p>
+<div class="btn-row"><button class="btn" id="resToggle">Enable residuals ▸</button><button class="btn ghost" id="resPlay">▶ Send gradient back</button></div>
+<div class="canvas-wrap"><canvas id="resCanvas" width="900" height="220"></canvas></div>
+<div class="legend"><span><span class="sw" style="background:#f2a65a"></span>strong gradient</span><span><span class="sw" style="background:#39415a"></span>vanished gradient</span><span><span class="sw" style="background:#5eead4"></span>skip path (×1)</span></div>`)
++ step('math',`
+<p>A residual sublayer:</p>
+<div class="eq">y <span class="op">=</span> x <span class="op">+</span> f(x)</div>
+<p>Differentiate w.r.t. x:</p>
+<div class="eq"><span class="frac"><span class="top">∂y</span><span class="bot">∂x</span></span> <span class="op">=</span> I <span class="op">+</span> <span class="frac"><span class="top">∂f</span><span class="bot">∂x</span></span></div>
+<p>The identity <code>I</code> guarantees the Jacobian never collapses to 0 — even if <code>∂f/∂x</code> is tiny, gradient still flows through the <code>I</code> term. Across L stacked layers, the gradient contains a path of all-ones products instead of a vanishing product of small Jacobians.</p>`)
++ step('dims',`
+<p>The addition requires matching shapes — that's why Transformer sublayers are shape-preserving:</p>
+<div class="shape-flow">
+${shapeRow('input x','[B, n, d]')}
+${shapeRow('sublayer f(x)','[B, n, d]')}
+${shapeRow('y = x + f(x)','[B, n, d]')}
+</div>
+<div class="callout"><span class="h">Why shapes must match</span>You can only add tensors of the same shape. This constraint is precisely why attention and the FFN both output <span class="shape-pill">[B, n, d]</span>.</div>`)
++ step('numeric',`
+<p>Suppose x = [1.0, 2.0] and the sublayer outputs f(x) = [0.1, −0.3] (a small correction). Then y = [1.1, 1.7]. If the sublayer learned f(x)=0, y would equal x exactly — the identity. The block only has to learn the <em>delta</em>.</p>`)
++ step('code',`
+${codeBlock('residual.py',
+`import torch.nn as nn
+
+class Sublayer(nn.Module):
+    def __init__(self, d, fn):
+        super().__init__()
+        self.norm = nn.LayerNorm(d)
+        self.fn = fn                      # e.g. attention or MLP
+
+    def forward(self, x):                 # pre-norm residual (GPT style)
+        return x + self.fn(self.norm(x))  # <-- the "+x" is the highway
+
+# Compare:
+#   no residual:   x = fn(norm(x))        # gradient must pass through fn
+#   residual:      x = x + fn(norm(x))    # gradient also flows via +x`)}
+<div class="explain-row">
+<div class="ln"><b>x + self.fn(...)</b> — the residual add. This single <code>+x</code> is what makes 100-layer Transformers trainable.</div>
+<div class="ln"><b>self.norm(x)</b> applied <em>inside</em> — pre-norm: normalize, transform, then add the raw x back. Keeps the residual stream clean.</div>
+</div>`)
++ step('quiz',quizBlock([
+  {q:'A residual connection computes:',
+   opts:['f(x) only','x + f(x)','x · f(x)','softmax(x)'],a:1,
+   why:'The input x is added to the sublayer output, creating a skip path that preserves gradient flow.'},
+  {q:'Why does x + f(x) help gradients?',
+   opts:['It increases the learning rate','Its derivative is I + ∂f/∂x, so the identity term keeps gradient from vanishing','It removes the need for LayerNorm','It applies softmax to gradients'],
+   a:1,why:'The "+x" contributes an identity Jacobian, guaranteeing a multiply-by-1 path back to early layers.'},
+  {q:'Residual connections let a layer easily learn:',
+   opts:['A full new transformation always','The identity (f(x)≈0) when the layer isn\'t needed','To ignore the input','Random outputs'],
+   a:1,why:'Learning a small residual (or zero) is easier than learning a useful transformation from scratch; unhelpful layers can pass x through.'},
+  {q:'Residual addition requires that x and f(x):',
+   opts:['Have different shapes','Have the same shape','Be scalars','Be positive'],a:1,
+   why:'Elementwise addition needs matching shapes — which is why Transformer sublayers preserve [B,n,d].'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Shape mismatch between x and f(x). If a sublayer changes <code>d</code>, the residual add fails — keep sublayers shape-preserving (or add a projection).</div>
+<div class="callout warn"><span class="h">Mistake</span>Putting LayerNorm in the wrong spot. Post-norm (<code>norm(x + f(x))</code>) trains worse at depth than pre-norm (<code>x + f(norm(x))</code>) for large GPTs.</div>
+<div class="callout warn"><span class="h">Mistake</span>Thinking residuals are optional polish. Remove them and deep Transformers essentially fail to train.</div>`);
+},
+init(){
+  const cv=document.getElementById('resCanvas');if(!cv)return;const ctx=cv.getContext('2d');
+  const L=6;let residual=false,grad=null,raf=null;
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    const xs=[];for(let i=0;i<L;i++)xs.push(110+i*135);
+    const y=120;
+    // forward arrows
+    for(let i=0;i<L-1;i++){ctx.strokeStyle='#262d40';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(xs[i]+28,y);ctx.lineTo(xs[i+1]-28,y);ctx.stroke();}
+    // skip arcs
+    if(residual)for(let i=0;i<L-1;i++){ctx.strokeStyle='#5eead4';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(xs[i],y-28);ctx.quadraticCurveTo((xs[i]+xs[i+1])/2,y-70,xs[i+1],y-28);ctx.stroke();}
+    // gradient magnitude per layer (from right to left)
+    for(let i=0;i<L;i++){
+      let mag=1;
+      if(grad!==null){
+        const idxFromRight=L-1-i;
+        if(idxFromRight<=grad){
+          mag = residual? 1 : Math.pow(0.5, grad-idxFromRight); // decays without residual
+        } else mag=0.04;
+      } else mag=0.6;
+      const col=lerpColor([57,65,90],[242,166,90],Math.max(0,Math.min(1,mag)));
+      ctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
+      ctx.beginPath();ctx.arc(xs[i],y,26,0,7);ctx.fill();
+      ctx.fillStyle='#0c0e14';ctx.font='bold 13px ui-monospace,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('L'+(i+1),xs[i],y);
+      if(grad!==null){ctx.fillStyle='#a7a899';ctx.font='10px ui-monospace,monospace';ctx.fillText(mag.toFixed(2),xs[i],y+44);}
+    }
+    ctx.fillStyle='#6f7382';ctx.font='12px ui-sans-serif';ctx.textAlign='left';
+    ctx.fillText('forward →',24,y+4);ctx.fillText('gradient flows ← back',24,40);
+  }
+  draw();
+  document.getElementById('resToggle').onclick=function(){residual=!residual;this.textContent=residual?'Disable residuals ◂':'Enable residuals ▸';draw();};
+  document.getElementById('resPlay').onclick=()=>{grad=0;cancelAnimationFrame(raf);(function step(){grad+=0.06;if(grad>L){grad=L-1;draw();return;}draw();raf=requestAnimationFrame(step);})();};
+}
+});
+
+/* ===================== MODULE 9 ===================== */
+MODULES.push({
+id:'m9',num:'9',section:'The Block',title:'Feed-Forward Network',
+render(){return header('9','Feed-Forward Network (MLP)',
+  'Linear → GELU → Linear · per-token processing',
+  'Attention mixes information between tokens. The feed-forward network then processes each token on its own, expanding to a wider hidden space, applying a nonlinearity, and projecting back. It is where much of a Transformer\'s "knowledge" lives.')
++ step('intuition',`
+<p>Attention is great at <em>routing</em> information — deciding which tokens talk to which. But attention is essentially a weighted average; it's a fairly <em>linear</em> mixing operation. To learn rich, nonlinear functions of each token's content, we need something else.</p>
+<p>The <strong>feed-forward network</strong> (a 2-layer MLP) runs on each token position independently and identically. It expands the dimension (typically <code>4×</code>: 768 → 3072), applies a nonlinearity (GELU), then contracts back. The wide hidden layer gives the model room to compute complex feature combinations; the nonlinearity is what makes the whole Transformer more than a stack of linear maps.</p>
+<div class="callout idea"><span class="h">Division of labor</span>Attention = <em>communication</em> across tokens. FFN = <em>computation</em> within each token. A block alternates the two.</div>`)
++ step('visual',`
+<p>The GELU activation — a smooth gate that lets positive values mostly pass and softly suppresses negatives (unlike ReLU's hard cutoff). Drag to see input → activation.</p>
+<div class="controls"><div class="control"><label>input value</label><input type="range" id="geluX" min="-4" max="4" step="0.1" value="0.8"><span class="val" id="geluXV">0.8</span></div></div>
+<div class="canvas-wrap"><canvas id="geluCanvas" width="900" height="300"></canvas></div>
+<p id="geluReadout" style="font-family:var(--mono);color:var(--teal)"></p>`)
++ step('math',`
+<p>The position-wise FFN:</p>
+<div class="eq">FFN(x) <span class="op">=</span> <span class="v">W<sub>2</sub></span>·GELU( <span class="v">W<sub>1</sub></span>x <span class="op">+</span> b<sub>1</sub> ) <span class="op">+</span> b<sub>2</sub></div>
+<p>with <code>W<sub>1</sub> ∈ ℝ<sup>d<sub>ff</sub>×d</sup></code>, <code>W<sub>2</sub> ∈ ℝ<sup>d×d<sub>ff</sub></sup></code>, typically <code>d<sub>ff</sub> = 4d</code>. GELU (Gaussian Error Linear Unit):</p>
+<div class="eq">GELU(x) <span class="op">=</span> x · Φ(x) <span class="op">≈</span> 0.5x(1 + tanh[√(2/π)(x + 0.044715x³)])</div>
+<p>where Φ is the standard normal CDF. GELU weights an input by the probability that a standard-normal variable is below it — a smooth, differentiable gate.</p>`)
++ step('dims',`
+<div class="shape-flow">
+${shapeRow('input','[B, n, d]')}
+${shapeRow('after W₁ (expand)','[B, n, d_ff] = [B, n, 4d]')}
+${shapeRow('after GELU','[B, n, d_ff]')}
+${shapeRow('after W₂ (contract)','[B, n, d]')}
+</div>
+<p>The FFN bulges out to <code>4d</code> then returns to <code>d</code> — shape-preserving end to end, so it fits inside a residual connection. Most of the model's <em>parameters</em> live here (two large matrices per block).</p>`)
++ step('numeric',`
+<p>GELU samples: GELU(−2) ≈ −0.045, GELU(−1) ≈ −0.159, GELU(0) = 0, GELU(1) ≈ 0.841, GELU(2) ≈ 1.955. Notice it's smooth, allows small negative outputs, and approaches the identity for large positive x. The interactive plot above shows the full curve.</p>`)
++ step('code',`
+${codeBlock('feed_forward.py',
+`import torch.nn as nn
+
+class FeedForward(nn.Module):
+    def __init__(self, d, d_ff=None, dropout=0.0):
+        super().__init__()
+        d_ff = d_ff or 4 * d              # standard 4x expansion
+        self.net = nn.Sequential(
+            nn.Linear(d, d_ff),           # expand: [.,d] -> [.,4d]
+            nn.GELU(),                    # smooth nonlinearity
+            nn.Linear(d_ff, d),           # contract: [.,4d] -> [.,d]
+            nn.Dropout(dropout),
+        )
+    def forward(self, x):                 # x: [B, n, d]
+        return self.net(x)                # [B, n, d]`)}
+<div class="explain-row">
+<div class="ln"><b>nn.Linear(d, 4*d)</b> — the expansion. The wide hidden layer is where complex per-token features are computed.</div>
+<div class="ln"><b>nn.GELU()</b> — the nonlinearity; without it, two linears collapse into one and the network can't model nonlinear functions.</div>
+<div class="ln"><b>nn.Linear(4*d, d)</b> — contracts back to model dim so the output can re-enter the residual stream.</div>
+</div>`)
++ step('quiz',quizBlock([
+  {q:'Why is a feed-forward network needed if we already have attention?',
+   opts:['Attention is too slow','Attention mainly mixes tokens linearly; the FFN adds per-token nonlinear computation','To reduce parameters','To apply the mask'],
+   a:1,why:'Attention routes information across positions but is largely a weighted average. The FFN supplies nonlinear, per-token processing.'},
+  {q:'The typical hidden dimension of the FFN relative to d_model is:',
+   opts:['Equal (1×)','Half (0.5×)','Four times (4×)','Ten times'],a:2,
+   why:'The standard design expands to d_ff = 4·d in the hidden layer, then contracts back to d.'},
+  {q:'The FFN processes tokens:',
+   opts:['Jointly, mixing all positions','Independently and identically at each position','Only the first token','In reverse order'],
+   a:1,why:'The same MLP is applied position-wise; it does not look across tokens (that\'s attention\'s job).'},
+  {q:'What does GELU provide that a pair of linear layers alone cannot?',
+   opts:['Nonlinearity','Normalization','Positional information','Causal masking'],a:0,
+   why:'Two linears compose to a single linear map; GELU\'s nonlinearity is what gives the FFN real expressive power.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Omitting the nonlinearity. Without GELU/ReLU, <code>W₂W₁x</code> is just one linear layer — the FFN does nothing extra.</div>
+<div class="callout warn"><span class="h">Mistake</span>Letting the FFN change <code>d</code>. It must return to <code>d</code> so it fits the residual add.</div>
+<div class="callout warn"><span class="h">Mistake</span>Underestimating FFN parameter cost. With d_ff=4d, the two matrices hold ~8d² params — usually the largest chunk of a block.</div>`);
+},
+init(){
+  const cv=document.getElementById('geluCanvas');if(!cv)return;const ctx=cv.getContext('2d');
+  function gelu(x){return 0.5*x*(1+Math.tanh(Math.sqrt(2/Math.PI)*(x+0.044715*x*x*x)));}
+  function draw(){
+    const xv=+document.getElementById('geluX').value;
+    document.getElementById('geluXV').textContent=xv.toFixed(1);
+    ctx.clearRect(0,0,cv.width,cv.height);
+    const pad=40,W=cv.width-pad*2,H=cv.height-pad*2;
+    const xmin=-4,xmax=4,ymin=-1,ymax=4;
+    const X=x=>pad+((x-xmin)/(xmax-xmin))*W, Y=y=>pad+H-((y-ymin)/(ymax-ymin))*H;
+    // axes
+    ctx.strokeStyle='#262d40';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(X(xmin),Y(0));ctx.lineTo(X(xmax),Y(0));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(X(0),Y(ymin));ctx.lineTo(X(0),Y(ymax));ctx.stroke();
+    // ReLU faint for comparison
+    ctx.strokeStyle='#39415a';ctx.setLineDash([5,5]);ctx.beginPath();
+    for(let x=xmin;x<=xmax;x+=0.05){const y=Math.max(0,x);if(x===xmin)ctx.moveTo(X(x),Y(y));else ctx.lineTo(X(x),Y(y));}ctx.stroke();ctx.setLineDash([]);
+    // GELU
+    ctx.strokeStyle='#5eead4';ctx.lineWidth=2.5;ctx.beginPath();
+    for(let x=xmin;x<=xmax;x+=0.03){const y=gelu(x);if(x===xmin)ctx.moveTo(X(x),Y(y));else ctx.lineTo(X(x),Y(y));}ctx.stroke();
+    // marker
+    const gy=gelu(xv);
+    ctx.fillStyle='#f2a65a';ctx.beginPath();ctx.arc(X(xv),Y(gy),6,0,7);ctx.fill();
+    ctx.strokeStyle='#f2a65a';ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(X(xv),Y(0));ctx.lineTo(X(xv),Y(gy));ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#6f7382';ctx.font='11px ui-monospace,monospace';ctx.textAlign='left';
+    ctx.fillText('GELU (teal) vs ReLU (dashed)',pad,pad-14);
+    document.getElementById('geluReadout').textContent=`GELU(${xv.toFixed(1)}) = ${gy.toFixed(4)}`;
+  }
+  document.getElementById('geluX').oninput=draw;draw();
+}
+});
+/* ===================== MODULE 10 ===================== */
+MODULES.push({
+id:'m10',num:'10',section:'The Block',title:'Complete Transformer Block',
+render(){return header('10','Complete Transformer Block',
+  'LayerNorm → MHA → Residual → LayerNorm → FFN → Residual',
+  'Now we assemble every piece you have learned — multi-head attention, layer normalization, residual connections, and the feed-forward network — into the single repeatable unit that GPT stacks dozens of times: the Transformer block.')
++ step('intuition',`
+<p>A Transformer block is a small, self-contained "thinking step." It does two things in sequence: first it lets tokens <em>communicate</em> (attention), then it lets each token <em>compute</em> on its own (FFN). Each sub-step is wrapped in a residual connection and preceded by a LayerNorm.</p>
+<p>Because the block preserves its input shape <code>[B, n, d]</code> exactly, you can stack it: the output of block 1 becomes the input of block 2, and so on. Stacking is what gives depth — and depth is what lets the model build increasingly abstract representations.</p>
+<div class="callout idea"><span class="h">Pre-norm design</span>Modern GPTs put LayerNorm <em>before</em> each sub-layer (pre-norm), not after. This keeps a clean residual "highway" running straight through the network, which makes very deep stacks trainable.</div>`)
++ step('visual',`
+<p>Click any component to see what it does. Data flows top → bottom; the two curved arrows are the residual adds.</p>
+<div class="canvas-wrap"><svg id="blockSvg" viewBox="0 0 460 520" width="100%" style="max-width:460px;display:block;margin:0 auto"></svg></div>
+<div class="block-detail" id="blockDetail">Click a block above to inspect it.</div>`)
++ step('math',`
+<p>With input <code>x ∈ ℝ<sup>n×d</sup></code>, the pre-norm block computes:</p>
+<div class="eq">a <span class="op">=</span> x <span class="op">+</span> MHA( LN<sub>1</sub>(x) )</div>
+<div class="eq">y <span class="op">=</span> a <span class="op">+</span> FFN( LN<sub>2</sub>(a) )</div>
+<p>Read it as: normalize, transform, then <em>add back</em> the original. The residual <code>x +</code> means each sub-layer only has to learn a <em>correction</em> to its input, not rebuild it from scratch.</p>`)
++ step('dims',`
+<div class="shape-flow">
+${shapeRow('block input  x','[B, n, d]')}
+${shapeRow('LN₁(x)','[B, n, d]')}
+${shapeRow('MHA(·)','[B, n, d]')}
+${shapeRow('a = x + MHA(LN₁(x))','[B, n, d]')}
+${shapeRow('LN₂(a)','[B, n, d]')}
+${shapeRow('FFN(·)','[B, n, d]')}
+${shapeRow('y = a + FFN(LN₂(a))','[B, n, d]')}
+</div>
+<p>Every intermediate tensor is <code>[B, n, d]</code>. Shape in = shape out — the property that makes blocks stackable.</p>`)
++ step('numeric',`
+<p>Suppose a single token's vector enters as <code>x = [1.0, −0.5]</code> (d=2). Attention reads context and proposes a small update <code>MHA = [0.2, 0.1]</code>. The residual gives <code>a = [1.2, −0.4]</code>. The FFN then proposes <code>[−0.1, 0.3]</code>, so <code>y = [1.1, −0.1]</code>. Notice the original signal is never destroyed — each sub-layer nudges it. Stack 12 blocks and these nudges compound into rich representations.</p>`)
++ step('code',`
+${codeBlock('transformer_block.py',
+`import torch.nn as nn
+
+class TransformerBlock(nn.Module):
+    def __init__(self, d, n_heads, d_ff=None, dropout=0.0):
+        super().__init__()
+        self.ln1 = nn.LayerNorm(d)
+        self.attn = MultiHeadAttention(d, n_heads, dropout)
+        self.ln2 = nn.LayerNorm(d)
+        self.ffn = FeedForward(d, d_ff, dropout)
+
+    def forward(self, x, mask=None):          # x: [B, n, d]
+        x = x + self.attn(self.ln1(x), mask)  # communicate (+ residual)
+        x = x + self.ffn(self.ln2(x))         # compute     (+ residual)
+        return x                              # [B, n, d]`)}
+<div class="explain-row">
+<div class="ln"><b>self.ln1(x)</b> — normalize before attention (pre-norm). The raw <b>x</b> is kept for the residual.</div>
+<div class="ln"><b>x = x + self.attn(...)</b> — residual add: attention output is a correction layered onto the input.</div>
+<div class="ln"><b>x = x + self.ffn(self.ln2(x))</b> — second sub-layer, same pattern: norm → transform → add back.</div>
+<div class="ln"><b>return x</b> — shape <b>[B, n, d]</b>, identical to the input, so the next block can consume it directly.</div>
+</div>`)
++ step('quiz',quizBlock([
+  {q:'What are the two sub-layers of a Transformer block, in order?',
+   opts:['FFN then attention','Multi-head attention then feed-forward network','Two attention layers','Two FFNs'],a:1,
+   why:'A block first mixes tokens with attention (communication), then processes each token with the FFN (computation).'},
+  {q:'In a pre-norm block, where does LayerNorm go?',
+   opts:['After each sub-layer','Before each sub-layer, inside the residual branch','Only at the very end','Only on the input embeddings'],a:1,
+   why:'Pre-norm applies LN to the input of each sub-layer, leaving a clean residual highway — the standard in modern GPTs.'},
+  {q:'Why does the block preserve the shape [B, n, d]?',
+   opts:['To save memory','So blocks can be stacked, output feeding directly into the next block','It does not — shape changes each block','Because of the softmax'],a:1,
+   why:'Shape-preservation is exactly what lets you stack N identical blocks.'},
+  {q:'What does the residual "+ x" let each sub-layer focus on learning?',
+   opts:['The full output from scratch','Only a correction/delta to its input','The attention mask','The vocabulary'],a:1,
+   why:'With x + f(x), the sub-layer f only needs to learn a residual adjustment, which eases optimization.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Mixing up the order. Attention comes first (mixing tokens), then the FFN. Swapping them changes the architecture.</div>
+<div class="callout warn"><span class="h">Mistake</span>Forgetting the second LayerNorm. Each sub-layer gets its own LN; reusing one harms training.</div>
+<div class="callout warn"><span class="h">Mistake</span>Adding the residual <em>inside</em> the LayerNorm branch. The raw input must skip the norm and be added back outside it.</div>`);
+},
+init(){
+  const svg=document.getElementById('blockSvg');if(!svg)return;
+  const NS='http://www.w3.org/2000/svg';
+  const comps=[
+    {id:'in',y:18,h:34,label:'input  x  [B, n, d]',fill:'#161a26',stroke:'#39415a',info:'<b>Block input.</b> A tensor of token representations, shape [B, n, d]. It carries everything learned by earlier blocks.'},
+    {id:'ln1',y:74,h:34,label:'LayerNorm 1',fill:'#1b2030',stroke:'#5eead4',info:'<b>LayerNorm (pre-attention).</b> Standardizes each token vector to mean 0, variance 1, then rescales with learnable γ, β. Stabilizes the inputs to attention.'},
+    {id:'mha',y:118,h:48,label:'Multi-Head Attention',fill:'#241c10',stroke:'#f2a65a',info:'<b>Multi-Head Attention.</b> Each token gathers information from other tokens through several parallel heads. This is the only place tokens communicate.'},
+    {id:'add1',y:176,h:30,label:'⊕  residual add  (x + …)',fill:'#15212a',stroke:'#5eead4',info:'<b>Residual add.</b> Adds the original x back to the attention output, so attention only needs to learn a correction. Keeps gradients flowing.'},
+    {id:'ln2',y:236,h:34,label:'LayerNorm 2',fill:'#1b2030',stroke:'#5eead4',info:'<b>LayerNorm (pre-FFN).</b> A second, independent normalization before the feed-forward network.'},
+    {id:'ffn',y:280,h:48,label:'Feed-Forward (Linear→GELU→Linear)',fill:'#241c10',stroke:'#f2a65a',info:'<b>Feed-Forward Network.</b> Processes each token independently: expand to 4d, GELU, contract back to d. Where most per-token computation happens.'},
+    {id:'add2',y:338,h:30,label:'⊕  residual add  (a + …)',fill:'#15212a',stroke:'#5eead4',info:'<b>Residual add.</b> Adds a (the post-attention tensor) back to the FFN output.'},
+    {id:'out',y:398,h:34,label:'output  y  [B, n, d]',fill:'#161a26',stroke:'#39415a',info:'<b>Block output.</b> Same shape as the input — ready to feed the next Transformer block.'}
+  ];
+  const X=70,W=320;
+  // connectors
+  for(let i=0;i<comps.length-1;i++){
+    const a=comps[i],b=comps[i+1];
+    const l=document.createElementNS(NS,'line');
+    l.setAttribute('x1',X+W/2);l.setAttribute('y1',a.y+a.h);
+    l.setAttribute('x2',X+W/2);l.setAttribute('y2',b.y);
+    l.setAttribute('stroke','#39415a');l.setAttribute('stroke-width','2');svg.appendChild(l);
+  }
+  // residual skip arcs
+  function arc(y1,y2,info){
+    const p=document.createElementNS(NS,'path');
+    p.setAttribute('d',`M ${X} ${y1} C 20 ${y1}, 20 ${y2}, ${X} ${y2}`);
+    p.setAttribute('fill','none');p.setAttribute('stroke','#5eead4');
+    p.setAttribute('stroke-width','2');p.setAttribute('stroke-dasharray','5 4');p.setAttribute('opacity','.8');
+    svg.appendChild(p);
+  }
+  arc(comps[0].y+comps[0].h/2, comps[3].y+comps[3].h/2);   // x -> add1
+  arc(comps[3].y+comps[3].h/2, comps[6].y+comps[6].h/2);   // a -> add2
+  const detail=document.getElementById('blockDetail');
+  comps.forEach(c=>{
+    const g=document.createElementNS(NS,'g');g.setAttribute('class','block-comp');
+    const r=document.createElementNS(NS,'rect');
+    r.setAttribute('x',X);r.setAttribute('y',c.y);r.setAttribute('width',W);r.setAttribute('height',c.h);
+    r.setAttribute('rx','9');r.setAttribute('fill',c.fill);r.setAttribute('stroke',c.stroke);r.setAttribute('stroke-width','1.5');
+    const t=document.createElementNS(NS,'text');
+    t.setAttribute('x',X+W/2);t.setAttribute('y',c.y+c.h/2+4);t.setAttribute('text-anchor','middle');
+    t.setAttribute('fill','#e7e3d8');t.setAttribute('font-size','12.5');t.setAttribute('font-family','ui-monospace,monospace');
+    t.textContent=c.label;
+    g.appendChild(r);g.appendChild(t);
+    g.addEventListener('click',()=>{detail.innerHTML=c.info;
+      svg.querySelectorAll('rect').forEach(rr=>rr.setAttribute('stroke-width','1.5'));
+      r.setAttribute('stroke-width','3.5');});
+    svg.appendChild(g);
+  });
+}
+});
+
+/* ===================== MODULE 11 ===================== */
+MODULES.push({
+id:'m11',num:'11',section:'The Block',title:'GPT Architecture',
+render(){return header('11','GPT Architecture',
+  'Tokens → Embed → +Position → N×Block → LN → Project → Softmax',
+  'Zoom out from one block to the whole model. GPT is a decoder-only Transformer: tokens go in, a stack of identical blocks refines their representations, and a final linear layer turns each position into a probability distribution over the next token.')
++ step('intuition',`
+<p>GPT is a <em>next-token predictor</em>. Given a sequence of tokens, at every position it predicts what comes next. That single objective, scaled up, is enough to produce models that write code, answer questions, and translate.</p>
+<p>The architecture is a sandwich: an <strong>embedding layer</strong> (turn IDs into vectors and add position) at the bottom, a tall stack of identical <strong>Transformer blocks</strong> in the middle, and an <strong>output head</strong> (a linear projection to vocabulary size, then softmax) on top.</p>
+<div class="callout idea"><span class="h">Decoder-only</span>GPT uses only the decoder half of the original Transformer, with causal masking so each position can attend only to earlier positions. No separate encoder.</div>`)
++ step('visual',`
+<p>The full forward pass. Press <b>Flow</b> to watch a sequence travel from token IDs to next-token probabilities.</p>
+<div class="btn-row"><button class="btn" id="gptFlowBtn">▶ Flow</button><button class="btn ghost" id="gptFlowReset">Reset</button></div>
+<div class="canvas-wrap"><canvas id="gptCanvas" width="900" height="420"></canvas></div>`)
++ step('math',`
+<p>For input token IDs <code>t = (t<sub>1</sub>,…,t<sub>n</sub>)</code>:</p>
+<div class="eq">h<sub>0</sub> <span class="op">=</span> E[t] <span class="op">+</span> P<span class="small"> &nbsp; (token embeddings + positional embeddings)</span></div>
+<div class="eq">h<sub>ℓ</sub> <span class="op">=</span> Block<sub>ℓ</sub>(h<sub>ℓ−1</sub>)<span class="small"> &nbsp; for ℓ = 1 … N</span></div>
+<div class="eq">logits <span class="op">=</span> LN(h<sub>N</sub>) <span class="v">W<sub>vocab</sub></span><span class="small"> &nbsp; shape [n, V]</span></div>
+<div class="eq">P(next | context) <span class="op">=</span> softmax(logits)</div>
+<p>The output projection <code>W<sub>vocab</sub> ∈ ℝ<sup>d×V</sup></code> is often <em>tied</em> to the embedding matrix (weight sharing) to save parameters.</p>`)
++ step('dims',`
+<div class="shape-flow">
+${shapeRow('token IDs','[B, n]')}
+${shapeRow('token embeddings  E[t]','[B, n, d]')}
+${shapeRow('+ positional','[B, n, d]')}
+${shapeRow('× N transformer blocks','[B, n, d]')}
+${shapeRow('final LayerNorm','[B, n, d]')}
+${shapeRow('output projection  → vocab','[B, n, V]')}
+${shapeRow('softmax (per position)','[B, n, V]')}
+</div>
+<p>The model maps <code>[B, n]</code> integer IDs to <code>[B, n, V]</code> probabilities — a distribution over the next token at <em>every</em> position simultaneously.</p>`)
++ step('numeric',`
+<p>Tiny GPT: vocab V=5, d=8, n=4, N=2 blocks. Input IDs <code>[2, 4, 4, 1]</code> → embed to <code>[4, 8]</code> → add positions → two blocks (shape stays <code>[4, 8]</code>) → project to <code>[4, 5]</code> logits → softmax. Position 4's row might read <code>[0.05, 0.10, 0.08, 0.07, 0.70]</code>, predicting token 0... (here index 4) as most likely next. During generation we keep only the <em>last</em> position's distribution and sample from it.</p>`)
++ step('code',`
+${codeBlock('gpt.py',
+`import torch, torch.nn as nn
+
+class GPT(nn.Module):
+    def __init__(self, vocab, d, n_heads, n_layers, max_len):
+        super().__init__()
+        self.tok_emb = nn.Embedding(vocab, d)
+        self.pos_emb = nn.Embedding(max_len, d)
+        self.blocks  = nn.ModuleList([
+            TransformerBlock(d, n_heads) for _ in range(n_layers)
+        ])
+        self.ln_f = nn.LayerNorm(d)
+        self.head = nn.Linear(d, vocab, bias=False)
+        # weight tying (optional): self.head.weight = self.tok_emb.weight
+
+    def forward(self, idx):                       # idx: [B, n]
+        B, n = idx.shape
+        pos = torch.arange(n, device=idx.device)  # [n]
+        x = self.tok_emb(idx) + self.pos_emb(pos) # [B, n, d]
+        mask = torch.triu(torch.ones(n, n), 1).bool()  # causal
+        for block in self.blocks:
+            x = block(x, mask)                    # [B, n, d]
+        x = self.ln_f(x)                          # [B, n, d]
+        return self.head(x)                       # [B, n, vocab]`)}
+<div class="explain-row">
+<div class="ln"><b>tok_emb + pos_emb</b> — content and order combined into one [B, n, d] tensor.</div>
+<div class="ln"><b>nn.ModuleList([...])</b> — N identical blocks; depth is just a loop.</div>
+<div class="ln"><b>torch.triu(...,1).bool()</b> — the causal mask: block every position from attending to the future.</div>
+<div class="ln"><b>self.head(x)</b> — projects each position to vocab-size logits, shape [B, n, vocab].</div>
+</div>`)
++ step('quiz',quizBlock([
+  {q:'GPT is best described as which type of Transformer?',
+   opts:['Encoder-only','Decoder-only with causal masking','Encoder-decoder','Bidirectional'],a:1,
+   why:'GPT uses a decoder-only stack with causal masking so each token sees only earlier tokens.'},
+  {q:'What is the shape of the model output (logits) for input [B, n]?',
+   opts:['[B, n]','[B, d]','[B, n, V] where V is vocab size','[B, V]'],a:2,
+   why:'The head projects every position to a vocab-size logit vector: [B, n, V].'},
+  {q:'During text generation, which position\'s distribution do we sample from?',
+   opts:['The first','A random one','The last position','The average of all'],a:2,
+   why:'We predict the next token, so we read the distribution at the final position of the current context.'},
+  {q:'What does "weight tying" refer to in GPT?',
+   opts:['Freezing the embeddings','Sharing the embedding matrix with the output projection','Tying heads together','Sharing weights across blocks'],a:1,
+   why:'The input embedding and output projection can share the same weight matrix, reducing parameters.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Forgetting the final LayerNorm before the head. Pre-norm models need <code>ln_f</code> after the last block.</div>
+<div class="callout warn"><span class="h">Mistake</span>Omitting the causal mask. Without it, GPT could "cheat" by looking at future tokens during training.</div>
+<div class="callout warn"><span class="h">Mistake</span>Thinking output is one prediction. GPT predicts a next-token distribution at <em>every</em> position in parallel during training.</div>`);
+},
+init(){
+  const cv=document.getElementById('gptCanvas');if(!cv)return;const ctx=cv.getContext('2d');
+  const stages=[
+    {t:'IDs',s:'[B,n]',c:'#39415a'},
+    {t:'Token Embed',s:'[B,n,d]',c:'#5eead4'},
+    {t:'+ Position',s:'[B,n,d]',c:'#5eead4'},
+    {t:'Block ×N',s:'[B,n,d]',c:'#f2a65a'},
+    {t:'LayerNorm',s:'[B,n,d]',c:'#5eead4'},
+    {t:'Project',s:'[B,n,V]',c:'#f2a65a'},
+    {t:'Softmax',s:'[B,n,V]',c:'#9aa6ff'}
+  ];
+  let lit=-1,raf=null;
+  const xs=[],y=150,bw=104,bh=64;
+  const gap=(cv.width-stages.length*bw)/(stages.length+1);
+  for(let i=0;i<stages.length;i++)xs.push(gap+i*(bw+gap));
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    // connectors
+    ctx.strokeStyle='#2a3147';ctx.lineWidth=2;
+    for(let i=0;i<stages.length-1;i++){
+      ctx.beginPath();ctx.moveTo(xs[i]+bw,y+bh/2);ctx.lineTo(xs[i+1],y+bh/2);ctx.stroke();
+      ctx.fillStyle='#2a3147';ctx.beginPath();ctx.moveTo(xs[i+1],y+bh/2);ctx.lineTo(xs[i+1]-8,y+bh/2-5);ctx.lineTo(xs[i+1]-8,y+bh/2+5);ctx.fill();
+    }
+    stages.forEach((s,i)=>{
+      const on=i<=lit;
+      ctx.fillStyle=on?'#161d2c':'#11141d';
+      ctx.strokeStyle=on?s.c:'#262d40';ctx.lineWidth=on?2.5:1.5;
+      const x=xs[i];
+      ctx.beginPath();ctx.roundRect(x,y,bw,bh,11);ctx.fill();ctx.stroke();
+      ctx.fillStyle=on?'#e7e3d8':'#5b6175';ctx.font='12.5px ui-sans-serif';ctx.textAlign='center';
+      ctx.fillText(s.t,x+bw/2,y+bh/2-2);
+      ctx.fillStyle=on?s.c:'#3a4258';ctx.font='10.5px ui-monospace,monospace';
+      ctx.fillText(s.s,x+bw/2,y+bh/2+16);
+    });
+    ctx.fillStyle='#6f7382';ctx.font='12px ui-sans-serif';ctx.textAlign='center';
+    ctx.fillText('GPT forward pass — integer IDs become a probability distribution over the next token',cv.width/2,40);
+    if(lit>=0){
+      ctx.fillStyle='#a7a899';ctx.font='12px ui-monospace,monospace';
+      ctx.fillText(stages[lit].t+'  '+stages[lit].s,cv.width/2,y+bh+44);
+    }
+  }
+  draw();
+  document.getElementById('gptFlowBtn').onclick=()=>{
+    cancelAnimationFrame(raf);lit=-1;let last=0;
+    (function stepf(ts){
+      if(!last)last=ts;
+      if(ts-last>520){lit++;last=ts;draw();}
+      if(lit<stages.length-1)raf=requestAnimationFrame(stepf);
+    })(0);
+  };
+  document.getElementById('gptFlowReset').onclick=()=>{cancelAnimationFrame(raf);lit=-1;draw();};
+}
+});
+
+/* ===================== MODULE 12 ===================== */
+MODULES.push({
+id:'m12',num:'12',section:'Training',title:'Training GPT',
+render(){return header('12','Training GPT',
+  'Forward → Cross-Entropy Loss → Backprop → Gradient Descent',
+  'Training is teaching GPT to predict the next token. We feed text, compare predictions to the true next tokens with cross-entropy loss, compute gradients by backpropagation, and nudge every weight downhill. Repeat millions of times.')
++ step('intuition',`
+<p>The training signal is free: any text is its own label. For the sequence "the cat sat", the input is "the cat" and the target is "cat sat" — each token's job is to predict the one after it. This is <strong>self-supervised</strong> learning; no human annotation needed.</p>
+<p>We measure how wrong the prediction is with <strong>cross-entropy loss</strong> (high when the model assigns low probability to the correct next token). <strong>Backpropagation</strong> computes how each weight contributed to that loss, and <strong>gradient descent</strong> shifts each weight a tiny step in the direction that reduces it.</p>
+<div class="callout idea"><span class="h">Teacher forcing</span>During training we feed the <em>true</em> previous tokens (not the model's own guesses) at each position, so all positions can be trained in parallel in a single forward pass.</div>`)
++ step('visual',`
+<p>A toy training loop. Each <b>Step</b> runs one gradient update on a fixed mini-batch; watch the loss fall and the predicted distribution sharpen toward the correct token.</p>
+<div class="btn-row"><button class="btn" id="trStep">Step ▸</button><button class="btn teal" id="trRun">▶ Run 40</button><button class="btn ghost" id="trReset">Reset</button></div>
+<div class="canvas-wrap"><canvas id="lossCanvas" width="900" height="300"></canvas></div>
+<p id="trReadout" style="font-family:var(--mono);color:var(--teal)"></p>`)
++ step('math',`
+<p>Cross-entropy for one position with true next-token index <code>y</code> and predicted distribution <code>p</code>:</p>
+<div class="eq">L <span class="op">=</span> −log p<sub>y</sub> <span class="op">=</span> −log softmax(logits)<sub>y</sub></div>
+<p>Averaged over all positions and the batch. The gradient with respect to the logits is beautifully simple:</p>
+<div class="eq">∂L/∂logits <span class="op">=</span> p <span class="op">−</span> onehot(y)</div>
+<p>i.e. "predicted probability minus the truth." A gradient-descent update on any weight <code>w</code>:</p>
+<div class="eq">w <span class="op">←</span> w <span class="op">−</span> η · ∂L/∂w<span class="small"> &nbsp; (η = learning rate)</span></div>`)
++ step('dims',`
+<div class="shape-flow">
+${shapeRow('input IDs','[B, n]')}
+${shapeRow('logits = model(input)','[B, n, V]')}
+${shapeRow('targets (shifted input)','[B, n]')}
+${shapeRow('reshape logits','[B·n, V]')}
+${shapeRow('reshape targets','[B·n]')}
+${shapeRow('cross_entropy → scalar','[]')}
+</div>
+<p>Cross-entropy expects logits as <code>[N, V]</code> and integer targets as <code>[N]</code>. We flatten the batch and sequence dims together (<code>N = B·n</code>) before computing the loss.</p>`)
++ step('numeric',`
+<p>Vocab V=4, one position. Logits <code>[2.0, 0.5, 0.5, 0.5]</code> → softmax ≈ <code>[0.60, 0.13, 0.13, 0.13]</code>. If the true next token is index 0, loss = −log(0.60) ≈ <strong>0.51</strong> — fairly low, the model is mostly right. If the truth were index 3, loss = −log(0.13) ≈ <strong>2.04</strong> — much higher, pushing those weights harder. The gradient on the logits is <code>p − onehot</code>: for truth=0 that's <code>[−0.40, 0.13, 0.13, 0.13]</code>, raising logit 0 and lowering the rest.</p>`)
++ step('code',`
+${codeBlock('train.py',
+`import torch, torch.nn.functional as F
+
+model = GPT(vocab, d, n_heads, n_layers, max_len)
+opt = torch.optim.AdamW(model.parameters(), lr=3e-4)
+
+for step in range(num_steps):
+    x, y = get_batch(data)          # x,y: [B, n]  (y is x shifted by 1)
+
+    logits = model(x)               # [B, n, V]
+    B, n, V = logits.shape
+    loss = F.cross_entropy(
+        logits.view(B * n, V),      # [B*n, V]
+        y.view(B * n)               # [B*n]
+    )
+
+    opt.zero_grad()                 # clear old gradients
+    loss.backward()                 # backprop: fill .grad on every weight
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    opt.step()                      # gradient-descent update
+
+    if step % 100 == 0:
+        print(step, loss.item())`)}
+<div class="explain-row">
+<div class="ln"><b>y = x shifted by 1</b> — the target at each position is simply the next token.</div>
+<div class="ln"><b>F.cross_entropy(logits, y)</b> — combines log-softmax and negative-log-likelihood in one call.</div>
+<div class="ln"><b>opt.zero_grad()</b> — gradients accumulate by default; clear them before each backward.</div>
+<div class="ln"><b>loss.backward()</b> — autograd walks the graph backward, filling <b>.grad</b> on every parameter.</div>
+<div class="ln"><b>clip_grad_norm_</b> — caps gradient size to prevent unstable spikes.</div>
+<div class="ln"><b>opt.step()</b> — AdamW applies the actual weight update using those gradients.</div>
+</div>`)
++ step('quiz',quizBlock([
+  {q:'What is the training target for next-token prediction?',
+   opts:['A human-written label','The input sequence shifted by one position','A random token','The class of the sentence'],a:1,
+   why:'Each token predicts the next, so targets are the inputs shifted by one — self-supervised, no labels required.'},
+  {q:'Cross-entropy loss is high when:',
+   opts:['The model assigns high probability to the correct token','The model assigns low probability to the correct token','The sequence is long','The learning rate is small'],a:1,
+   why:'L = −log p(correct); low probability on the true token means a large loss.'},
+  {q:'What does loss.backward() do?',
+   opts:['Updates the weights','Computes gradients of the loss w.r.t. every parameter','Resets the optimizer','Runs the forward pass'],a:1,
+   why:'backward() runs backpropagation, populating .grad on each parameter. The update itself happens in opt.step().'},
+  {q:'Why call opt.zero_grad() each step?',
+   opts:['To reset the weights','Because PyTorch accumulates gradients by default','To free GPU memory','To shuffle the data'],a:1,
+   why:'Gradients add up across backward() calls; without zeroing, you would mix gradients from different batches.'},
+  {q:'The gradient of cross-entropy w.r.t. the logits equals:',
+   opts:['p (the softmax output)','p − onehot(y)','−log p','the learning rate'],a:1,
+   why:'A classic result: ∂L/∂logits = predicted probabilities minus the one-hot truth.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Misaligning targets. Targets must be inputs shifted by exactly one; an off-by-one bug silently wrecks training.</div>
+<div class="callout warn"><span class="h">Mistake</span>Forgetting <code>zero_grad()</code>. Gradients accumulate, so the update uses stale, summed gradients.</div>
+<div class="callout warn"><span class="h">Mistake</span>Calling <code>opt.step()</code> before <code>loss.backward()</code>. No gradients exist yet, so nothing meaningful updates.</div>
+<div class="callout warn"><span class="h">Mistake</span>Wrong reshape for cross-entropy. It needs <code>[N, V]</code> logits and <code>[N]</code> targets — flatten batch and sequence first.</div>`);
+},
+init(){
+  const cv=document.getElementById('lossCanvas');if(!cv)return;const ctx=cv.getContext('2d');
+  const V=4, target=0;
+  let logits, hist, raf=null;
+  function reset(){logits=[0.2,0.1,0.0,-0.1];hist=[];draw();out();}
+  function softmax(a){const m=Math.max(...a);const e=a.map(v=>Math.exp(v-m));const s=e.reduce((x,y)=>x+y,0);return e.map(v=>v/s);}
+  function trainStep(){
+    const p=softmax(logits);const lr=0.6;
+    for(let i=0;i<V;i++){const g=p[i]-(i===target?1:0);logits[i]-=lr*g;}
+    const loss=-Math.log(softmax(logits)[target]);
+    hist.push(loss);if(hist.length>120)hist.shift();
+    draw();out();
+  }
+  function out(){
+    const p=softmax(logits);
+    document.getElementById('trReadout').textContent=
+      `step ${hist.length}  ·  loss ${(hist.length?hist[hist.length-1]:-Math.log(p[target])).toFixed(3)}  ·  p(correct)=${p[target].toFixed(3)}  ·  probs [${p.map(v=>v.toFixed(2)).join(', ')}]`;
+  }
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    const pad=44,W=cv.width-pad*2,H=cv.height-pad*2;
+    // loss curve panel (left 60%)
+    const cw=W*0.6;
+    ctx.strokeStyle='#262d40';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,pad+H);ctx.lineTo(pad+cw,pad+H);ctx.stroke();
+    ctx.fillStyle='#6f7382';ctx.font='11px ui-monospace,monospace';ctx.textAlign='right';
+    ctx.fillText('loss',pad-8,pad+8);ctx.textAlign='left';ctx.fillText('steps →',pad+4,pad+H+20);
+    const ymax=2.2;
+    if(hist.length>1){
+      ctx.strokeStyle='#f2a65a';ctx.lineWidth=2.5;ctx.beginPath();
+      hist.forEach((l,i)=>{const x=pad+(i/(120-1))*cw;const yv=pad+H-(Math.min(l,ymax)/ymax)*H;if(i===0)ctx.moveTo(x,yv);else ctx.lineTo(x,yv);});
+      ctx.stroke();
+    }
+    // prob bars panel (right)
+    const p=softmax(logits);const bx=pad+cw+40,bw=26,bgap=18,base=pad+H;
+    ctx.fillStyle='#6f7382';ctx.font='11px ui-sans-serif';ctx.textAlign='center';
+    ctx.fillText('P(next token)',bx+ (V*(bw+bgap))/2 -bgap/2, pad-2);
+    for(let i=0;i<V;i++){
+      const h=p[i]*H;const x=bx+i*(bw+bgap);
+      ctx.fillStyle=i===target?'#5eead4':'#39415a';
+      ctx.fillRect(x,base-h,bw,h);
+      ctx.fillStyle=i===target?'#5eead4':'#6f7382';ctx.font='10px ui-monospace,monospace';
+      ctx.fillText('t'+i,x+bw/2,base+14);
+      ctx.fillText(p[i].toFixed(2),x+bw/2,base-h-6);
+    }
+    ctx.fillStyle='#5eead4';ctx.font='10px ui-sans-serif';ctx.textAlign='left';
+    ctx.fillText('teal = correct token',bx,base+34);
+  }
+  reset();
+  document.getElementById('trStep').onclick=trainStep;
+  document.getElementById('trReset').onclick=reset;
+  document.getElementById('trRun').onclick=()=>{cancelAnimationFrame(raf);let k=0;(function loop(){trainStep();if(++k<40)raf=requestAnimationFrame(loop);})();};
+}
+});
+/* ===================== MODULE 13 ===================== */
+MODULES.push({
+id:'m13',num:'13',section:'Training',title:'Build GPT in PyTorch',
+render(){return header('13','Build GPT in PyTorch',
+  'Six progressive layers, from nn.Embedding to a full training loop',
+  'Everything assembled into runnable code. Each section builds on the previous one — expand them in order, read the line-by-line notes, and you have a complete, minimal GPT you could train today.')
++ step('intuition',`
+<p>You have seen each piece in isolation. Here they stack into one file. The progression mirrors the modules: embeddings → single-head attention → multi-head → block → full model → training loop. Nothing is hidden; every tensor shape is annotated in the comments.</p>
+<div class="callout idea"><span class="h">How to read this</span>Expand one block at a time. Each later block <em>uses</em> the classes defined in the earlier ones, exactly as you would build the file top to bottom.</div>`)
++ step('visual',`
+<p>The dependency chain — each layer is consumed by the next:</p>
+<div class="shape-flow">
+${shapeRow('1 · Embeddings','token + position → [B, n, d]')}
+${shapeRow('2 · Self-Attention','one head of QKV attention')}
+${shapeRow('3 · Multi-Head Attention','h heads in parallel → project')}
+${shapeRow('4 · Transformer Block','LN → MHA → res → LN → FFN → res')}
+${shapeRow('5 · GPT Model','embed → N blocks → head')}
+${shapeRow('6 · Training Loop','batch → loss → backward → step')}
+</div>`)
++ step('math',`
+<p>No new math here — this section is the implementation of equations from Modules 2–12. Keep these shape contracts in mind as you read: attention is <code>softmax(QKᵀ/√d<sub>k</sub> + mask)V</code>, a block is <code>x + f(LN(x))</code> twice, and the loss is <code>cross_entropy(logits, targets)</code>.</p>`)
++ step('dims',`
+<p>The single most useful habit when building models: annotate every line with the tensor shape, as the comments below do. If a shape comment and reality disagree, you have found your bug.</p>
+<div class="shape-flow">
+${shapeRow('idx','[B, n]')}
+${shapeRow('x = emb(idx)+pos','[B, n, d]')}
+${shapeRow('Q,K,V per head','[B, h, n, d_k]')}
+${shapeRow('scores','[B, h, n, n]')}
+${shapeRow('block out','[B, n, d]')}
+${shapeRow('logits','[B, n, V]')}
+</div>`)
++ step('code',`
+<p><strong>1 · Embeddings</strong></p>
+${codeBlock('1_embeddings.py',
+`import torch, torch.nn as nn
+
+class GPTEmbedding(nn.Module):
+    def __init__(self, vocab, d, max_len):
+        super().__init__()
+        self.tok = nn.Embedding(vocab, d)   # [vocab, d] lookup table
+        self.pos = nn.Embedding(max_len, d) # [max_len, d] positions
+
+    def forward(self, idx):                 # idx: [B, n]
+        n = idx.size(1)
+        positions = torch.arange(n, device=idx.device)  # [n]
+        return self.tok(idx) + self.pos(positions)       # [B, n, d]`,{collapsible:true})}
+<div class="explain-row">
+<div class="ln"><b>nn.Embedding(vocab, d)</b> — learnable [vocab, d] table; row i is token i's vector.</div>
+<div class="ln"><b>self.tok(idx) + self.pos(positions)</b> — broadcast-add content and order into [B, n, d].</div>
+</div>
+
+<p><strong>2 · Self-Attention (one head)</strong></p>
+${codeBlock('2_attention.py',
+`import math, torch, torch.nn as nn, torch.nn.functional as F
+
+class SelfAttention(nn.Module):
+    def __init__(self, d, d_k):
+        super().__init__()
+        self.Wq = nn.Linear(d, d_k, bias=False)
+        self.Wk = nn.Linear(d, d_k, bias=False)
+        self.Wv = nn.Linear(d, d_k, bias=False)
+        self.d_k = d_k
+
+    def forward(self, x, mask=None):        # x: [B, n, d]
+        Q, K, V = self.Wq(x), self.Wk(x), self.Wv(x)     # [B, n, d_k]
+        scores = Q @ K.transpose(-2, -1) / math.sqrt(self.d_k)  # [B, n, n]
+        if mask is not None:
+            scores = scores.masked_fill(mask, float('-inf'))
+        attn = F.softmax(scores, dim=-1)    # [B, n, n]
+        return attn @ V                     # [B, n, d_k]`,{collapsible:true,collapsed:true})}
+<div class="explain-row">
+<div class="ln"><b>Q @ K.transpose(-2,-1)</b> — every query dotted with every key → [B, n, n] score grid.</div>
+<div class="ln"><b>/ math.sqrt(d_k)</b> — the scaling that keeps softmax gradients healthy.</div>
+<div class="ln"><b>masked_fill(mask, -inf)</b> — set future positions to −∞ so softmax zeroes them.</div>
+<div class="ln"><b>attn @ V</b> — weighted sum of value vectors → the attention output.</div>
+</div>
+
+<p><strong>3 · Multi-Head Attention</strong></p>
+${codeBlock('3_multihead.py',
+`class MultiHeadAttention(nn.Module):
+    def __init__(self, d, n_heads, dropout=0.0):
+        super().__init__()
+        assert d % n_heads == 0
+        self.h, self.d_k = n_heads, d // n_heads
+        self.qkv  = nn.Linear(d, 3 * d)     # fused Q,K,V projection
+        self.proj = nn.Linear(d, d)
+        self.drop = nn.Dropout(dropout)
+
+    def forward(self, x, mask=None):        # x: [B, n, d]
+        B, n, d = x.shape
+        qkv = self.qkv(x)                   # [B, n, 3d]
+        q, k, v = qkv.chunk(3, dim=-1)      # each [B, n, d]
+        # split heads: [B, n, d] -> [B, h, n, d_k]
+        q = q.view(B, n, self.h, self.d_k).transpose(1, 2)
+        k = k.view(B, n, self.h, self.d_k).transpose(1, 2)
+        v = v.view(B, n, self.h, self.d_k).transpose(1, 2)
+        scores = (q @ k.transpose(-2, -1)) / self.d_k**0.5  # [B, h, n, n]
+        if mask is not None:
+            scores = scores.masked_fill(mask, float('-inf'))
+        attn = self.drop(scores.softmax(-1))
+        out = attn @ v                      # [B, h, n, d_k]
+        out = out.transpose(1, 2).reshape(B, n, d)  # concat heads
+        return self.proj(out)               # [B, n, d]`,{collapsible:true,collapsed:true})}
+<div class="explain-row">
+<div class="ln"><b>self.qkv = nn.Linear(d, 3*d)</b> — one fused matmul produces Q, K, V together (faster).</div>
+<div class="ln"><b>.view(...).transpose(1,2)</b> — reshape into [B, h, n, d_k] so heads run in parallel.</div>
+<div class="ln"><b>out.transpose(1,2).reshape(B,n,d)</b> — concatenate the heads back into one vector.</div>
+<div class="ln"><b>self.proj(out)</b> — final linear mixing the heads' information.</div>
+</div>
+
+<p><strong>4 · Transformer Block</strong></p>
+${codeBlock('4_block.py',
+`class FeedForward(nn.Module):
+    def __init__(self, d, dropout=0.0):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(d, 4 * d), nn.GELU(),
+            nn.Linear(4 * d, d), nn.Dropout(dropout))
+    def forward(self, x):
+        return self.net(x)
+
+class TransformerBlock(nn.Module):
+    def __init__(self, d, n_heads, dropout=0.0):
+        super().__init__()
+        self.ln1 = nn.LayerNorm(d)
+        self.attn = MultiHeadAttention(d, n_heads, dropout)
+        self.ln2 = nn.LayerNorm(d)
+        self.ffn = FeedForward(d, dropout)
+    def forward(self, x, mask=None):        # x: [B, n, d]
+        x = x + self.attn(self.ln1(x), mask)
+        x = x + self.ffn(self.ln2(x))
+        return x`,{collapsible:true,collapsed:true})}
+<div class="explain-row">
+<div class="ln"><b>x + self.attn(self.ln1(x), mask)</b> — pre-norm attention sub-layer with residual.</div>
+<div class="ln"><b>x + self.ffn(self.ln2(x))</b> — pre-norm FFN sub-layer with residual.</div>
+</div>
+
+<p><strong>5 · GPT Model</strong></p>
+${codeBlock('5_gpt.py',
+`class GPT(nn.Module):
+    def __init__(self, vocab, d, n_heads, n_layers, max_len, dropout=0.0):
+        super().__init__()
+        self.emb = GPTEmbedding(vocab, d, max_len)
+        self.blocks = nn.ModuleList(
+            [TransformerBlock(d, n_heads, dropout) for _ in range(n_layers)])
+        self.ln_f = nn.LayerNorm(d)
+        self.head = nn.Linear(d, vocab, bias=False)
+        self.head.weight = self.emb.tok.weight   # weight tying
+
+    def forward(self, idx, targets=None):   # idx: [B, n]
+        n = idx.size(1)
+        x = self.emb(idx)                   # [B, n, d]
+        mask = torch.triu(torch.ones(n, n, device=idx.device), 1).bool()
+        for blk in self.blocks:
+            x = blk(x, mask)                # [B, n, d]
+        logits = self.head(self.ln_f(x))    # [B, n, vocab]
+        loss = None
+        if targets is not None:
+            loss = F.cross_entropy(
+                logits.view(-1, logits.size(-1)), targets.view(-1))
+        return logits, loss`,{collapsible:true,collapsed:true})}
+<div class="explain-row">
+<div class="ln"><b>nn.ModuleList([...])</b> — the stack of N identical blocks.</div>
+<div class="ln"><b>self.head.weight = self.emb.tok.weight</b> — tie input/output embeddings to save params.</div>
+<div class="ln"><b>torch.triu(...,1).bool()</b> — causal mask built fresh for the current length n.</div>
+<div class="ln"><b>cross_entropy(logits.view(-1,V), targets.view(-1))</b> — flatten then score.</div>
+</div>
+
+<p><strong>6 · Training Loop</strong></p>
+${codeBlock('6_train.py',
+`model = GPT(vocab=65, d=128, n_heads=4, n_layers=4, max_len=128)
+opt = torch.optim.AdamW(model.parameters(), lr=3e-4)
+
+for step in range(5000):
+    x, y = get_batch('train')           # [B, n], [B, n]
+    logits, loss = model(x, y)
+    opt.zero_grad(set_to_none=True)
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    opt.step()
+    if step % 500 == 0:
+        print(f'step {step}: loss {loss.item():.4f}')
+
+@torch.no_grad()
+def generate(model, idx, max_new, temp=1.0):
+    for _ in range(max_new):
+        logits, _ = model(idx[:, -model.emb.pos.num_embeddings:])
+        logits = logits[:, -1, :] / temp       # last position
+        probs = F.softmax(logits, dim=-1)
+        nxt = torch.multinomial(probs, 1)      # sample
+        idx = torch.cat([idx, nxt], dim=1)
+    return idx`,{collapsible:true,collapsed:true})}
+<div class="explain-row">
+<div class="ln"><b>model(x, y)</b> — returns logits and loss in one call (targets provided).</div>
+<div class="ln"><b>@torch.no_grad()</b> — generation needs no gradients; saves memory and time.</div>
+<div class="ln"><b>logits[:, -1, :]</b> — only the last position predicts the next token.</div>
+<div class="ln"><b>torch.multinomial(probs, 1)</b> — sample the next token; append and repeat.</div>
+</div>`)
++ step('numeric',`
+<p>Instantiate <code>GPT(vocab=65, d=128, n_heads=4, n_layers=4, max_len=128)</code> and you get roughly: embeddings 65·128 ≈ 8K, each block ≈ 4·128² (attn) + 8·128² (ffn) ≈ 200K, times 4 blocks ≈ 800K, for a model around <strong>0.8M parameters</strong> — small enough to train on a laptop on a character-level dataset like tiny-shakespeare, exactly as in Karpathy's nanoGPT.</p>`)
++ step('quiz',quizBlock([
+  {q:'Why fuse Q, K, V into a single nn.Linear(d, 3*d)?',
+   opts:['It changes the math','One matmul is more efficient than three','To reduce parameters','It is required by PyTorch'],a:1,
+   why:'Mathematically identical, but a single fused projection is faster than three separate ones.'},
+  {q:'What does out.transpose(1,2).reshape(B, n, d) accomplish in MHA?',
+   opts:['Applies the mask','Concatenates the per-head outputs back into one vector','Computes the softmax','Adds positions'],a:1,
+   why:'It merges the head dimension back into the model dimension — the "concat heads" step before the output projection.'},
+  {q:'During generation, which slice of logits is used?',
+   opts:['All positions','The first position','The last position [:, -1, :]','A random position'],a:2,
+   why:'We sample the next token from the distribution at the final position of the current context.'},
+  {q:'What is the purpose of @torch.no_grad() on generate()?',
+   opts:['Speed up training','Disable gradient tracking during inference to save memory','Enable dropout','Tie the weights'],a:1,
+   why:'Inference does not need gradients, so disabling autograd reduces memory and overhead.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Wrong head-split reshape. You must <code>view(B,n,h,d_k).transpose(1,2)</code>; reshaping straight to [B,h,n,d_k] scrambles the data.</div>
+<div class="callout warn"><span class="h">Mistake</span>Cropping context during generation. Feed at most <code>max_len</code> tokens or positional embeddings overflow.</div>
+<div class="callout warn"><span class="h">Mistake</span>Leaving dropout on at inference. Call <code>model.eval()</code> so dropout/other train-only layers behave correctly.</div>
+<div class="callout warn"><span class="h">Mistake</span>Tying weights with mismatched shapes. Weight tying needs <code>head.weight</code> and <code>tok.weight</code> to share the same [vocab, d] shape.</div>`);
+},
+init(){}
+});
+
+/* ===================== MODULE 14 ===================== */
+MODULES.push({
+id:'m14',num:'14',section:'Mastery',title:'Tensor Shapes Masterclass',
+render(){return header('14','Tensor Shapes Masterclass',
+  'Trace B=2, n=4, d=8, heads=2 through the entire forward pass',
+  'The single skill that separates people who can read model code from those who cannot: tracking tensor shapes. Here we follow one concrete configuration through every transformation, step by step.')
++ step('intuition',`
+<p>A Transformer is, mechanically, a sequence of reshapes and matrix multiplies. If you always know the shape of the tensor in your hands, you can read any implementation and spot any bug. Most "mysterious" errors are just a shape mismatch.</p>
+<div class="callout idea"><span class="h">The mantra</span>Name your dims: B (batch), n (sequence length), d (model dim), h (heads), d_k = d/h (head dim), V (vocab). Then every shape is one of a handful of patterns.</div>`)
++ step('visual',`
+<p>Click <b>Next</b> to walk one tensor through the network. The highlighted shape is the tensor currently "in hand."</p>
+<div class="btn-row"><button class="btn ghost" id="tsPrev">◂ Prev</button><button class="btn" id="tsNext">Next ▸</button></div>
+<div class="canvas-wrap"><canvas id="tsCanvas" width="900" height="160"></canvas></div>
+<div class="block-detail" id="tsDetail"></div>`)
++ step('math',`
+<p>The reshape that trips everyone up is the head split. Starting from <code>[B, n, d]</code> with <code>d = h·d_k</code>:</p>
+<div class="eq">[B, n, d] <span class="op">→</span> view <span class="op">→</span> [B, n, h, d<sub>k</sub>] <span class="op">→</span> transpose(1,2) <span class="op">→</span> [B, h, n, d<sub>k</sub>]</div>
+<p>Now the h dimension sits next to B, so attention runs independently per head as a batched matmul over the last two dims <code>[n, d<sub>k</sub>]</code>.</p>`)
++ step('dims',`
+<p>The complete trace for <code>B=2, n=4, d=8, h=2, d_k=4, V=10</code>:</p>
+<div class="shape-flow">
+${shapeRow('input IDs','[2, 4]')}
+${shapeRow('token + pos embedding','[2, 4, 8]')}
+${shapeRow('qkv = Linear(8, 24)','[2, 4, 24]')}
+${shapeRow('chunk → q, k, v','[2, 4, 8] each')}
+${shapeRow('view → [B, n, h, d_k]','[2, 4, 2, 4]')}
+${shapeRow('transpose(1,2)','[2, 2, 4, 4]')}
+${shapeRow('scores = q @ kᵀ','[2, 2, 4, 4]')}
+${shapeRow('softmax (last dim)','[2, 2, 4, 4]')}
+${shapeRow('attn @ v','[2, 2, 4, 4]')}
+${shapeRow('transpose + reshape (concat)','[2, 4, 8]')}
+${shapeRow('output projection','[2, 4, 8]')}
+${shapeRow('after FFN + residuals','[2, 4, 8]')}
+${shapeRow('final LayerNorm','[2, 4, 8]')}
+${shapeRow('head: Linear(8, 10)','[2, 4, 10]')}
+</div>`)
++ step('numeric',`
+<p>Parameter counts for this toy config: token embedding 10·8 = 80, positional (say max_len 16) 16·8 = 128, fused QKV 8·24 = 192, attention output proj 8·8 = 64, FFN 8·32 + 32·8 = 512, plus small LayerNorm and bias terms. One block ≈ 800 params; the whole toy model is on the order of a thousand parameters — tiny, but the <em>shapes</em> are identical to a model with billions.</p>`)
++ step('code',`
+${codeBlock('shape_trace.py',
+`B, n, d, h = 2, 4, 8, 2
+d_k = d // h                  # 4
+
+idx   = torch.randint(0, 10, (B, n))      # [2, 4]
+x     = embed(idx)                        # [2, 4, 8]
+qkv   = qkv_linear(x)                     # [2, 4, 24]
+q,k,v = qkv.chunk(3, dim=-1)              # [2, 4, 8] x3
+q = q.view(B, n, h, d_k).transpose(1, 2)  # [2, 2, 4, 4]
+k = k.view(B, n, h, d_k).transpose(1, 2)  # [2, 2, 4, 4]
+v = v.view(B, n, h, d_k).transpose(1, 2)  # [2, 2, 4, 4]
+scores = q @ k.transpose(-2, -1)          # [2, 2, 4, 4]
+attn   = scores.softmax(-1)               # [2, 2, 4, 4]
+out    = attn @ v                         # [2, 2, 4, 4]
+out    = out.transpose(1, 2).reshape(B, n, d)  # [2, 4, 8]
+logits = head(out)                        # [2, 4, 10]
+# tip: print(x.shape) liberally while debugging!`)}`)
++ step('quiz',quizBlock([
+  {q:'With d=8 and h=2, what is d_k (per-head dimension)?',
+   opts:['2','4','8','16'],a:1,why:'d_k = d / h = 8 / 2 = 4.'},
+  {q:'After splitting heads, the Q tensor shape is:',
+   opts:['[B, n, d]','[B, h, n, d_k]','[B, d_k, n, h]','[n, d]'],a:1,
+   why:'view to [B, n, h, d_k] then transpose(1,2) gives [B, h, n, d_k].'},
+  {q:'The attention scores tensor (this config) has shape:',
+   opts:['[2, 4, 8]','[2, 2, 4, 4]','[2, 4, 10]','[4, 4]'],a:1,
+   why:'q @ kᵀ over [B, h, n, d_k] yields [B, h, n, n] = [2, 2, 4, 4].'},
+  {q:'What turns [2, 2, 4, 4] back into [2, 4, 8] after attention?',
+   opts:['softmax','transpose(1,2) then reshape (concat heads)','another Linear(8,8)','adding positions'],a:1,
+   why:'Move the head dim back beside d_k and merge them: transpose(1,2).reshape(B, n, d).'},
+  {q:'Final logits shape for B=2, n=4, V=10:',
+   opts:['[2, 4, 8]','[2, 4, 10]','[2, 10]','[8, 10]'],a:1,
+   why:'The head Linear(d, V) maps each of the 4 positions to V=10 logits: [2, 4, 10].'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Confusing <code>view/reshape</code> with <code>transpose</code>. Transpose reorders axes; view reinterprets memory. The head split needs both, in order.</div>
+<div class="callout warn"><span class="h">Mistake</span>Softmax on the wrong dim. It must be the <em>last</em> (key) dimension so each query's weights sum to 1.</div>
+<div class="callout warn"><span class="h">Mistake</span>Calling <code>.view()</code> after a transpose without <code>.contiguous()</code>. Use <code>.reshape()</code> or add <code>.contiguous()</code> to avoid a runtime error.</div>`);
+},
+init(){
+  const cv=document.getElementById('tsCanvas');if(!cv)return;const ctx=cv.getContext('2d');
+  const steps=[
+    {l:'IDs',s:'[2, 4]',d:'Integer token IDs: batch of 2 sequences, each 4 tokens long.'},
+    {l:'Embed',s:'[2, 4, 8]',d:'Each ID becomes an 8-dim vector; positions added. Now we have content + order.'},
+    {l:'QKV',s:'[2, 4, 24]',d:'Fused projection Linear(8, 24) produces Q, K, V stacked along the last dim.'},
+    {l:'split heads',s:'[2, 2, 4, 4]',d:'Reshaped to [B, h, n, d_k]. Two heads now run in parallel.'},
+    {l:'scores',s:'[2, 2, 4, 4]',d:'q @ kᵀ: for each head, a 4×4 grid of query-key similarities.'},
+    {l:'attn·V',s:'[2, 2, 4, 4]',d:'Softmaxed scores weight the value vectors per head.'},
+    {l:'concat',s:'[2, 4, 8]',d:'Heads merged back: transpose(1,2).reshape(B, n, d).'},
+    {l:'block out',s:'[2, 4, 8]',d:'After output projection, FFN, and residuals — shape preserved.'},
+    {l:'logits',s:'[2, 4, 10]',d:'Head maps each position to V=10 vocabulary logits.'}
+  ];
+  let i=0;
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    const n=steps.length,bw=84,y=46,bh=50;
+    const gap=(cv.width-n*bw)/(n+1);
+    for(let k=0;k<n;k++){
+      const x=gap+k*(bw+gap),on=k===i,done=k<i;
+      ctx.fillStyle=on?'#241c10':(done?'#161d2c':'#11141d');
+      ctx.strokeStyle=on?'#f2a65a':(done?'#5eead4':'#262d40');ctx.lineWidth=on?2.5:1.5;
+      ctx.beginPath();ctx.roundRect(x,y,bw,bh,10);ctx.fill();ctx.stroke();
+      ctx.fillStyle=on?'#f2a65a':'#9aa3b5';ctx.font='11px ui-sans-serif';ctx.textAlign='center';
+      ctx.fillText(steps[k].l,x+bw/2,y+20);
+      ctx.fillStyle=on?'#e7e3d8':'#5b6175';ctx.font='10px ui-monospace,monospace';
+      ctx.fillText(steps[k].s,x+bw/2,y+38);
+      if(k<n-1){ctx.strokeStyle='#2a3147';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x+bw,y+bh/2);ctx.lineTo(x+bw+gap,y+bh/2);ctx.stroke();}
+    }
+    ctx.fillStyle='#6f7382';ctx.font='12px ui-sans-serif';ctx.textAlign='center';
+    ctx.fillText('B=2  n=4  d=8  h=2  d_k=4  V=10',cv.width/2,22);
+  }
+  function detail(){document.getElementById('tsDetail').innerHTML='<b>'+steps[i].l+'</b> &nbsp; <span style="font-family:var(--mono);color:var(--teal)">'+steps[i].s+'</span><br>'+steps[i].d;}
+  draw();detail();
+  document.getElementById('tsNext').onclick=()=>{i=Math.min(steps.length-1,i+1);draw();detail();};
+  document.getElementById('tsPrev').onclick=()=>{i=Math.max(0,i-1);draw();detail();};
+}
+});
+
+/* ===================== MODULE 15 ===================== */
+MODULES.push({
+id:'m15',num:'15',section:'Mastery',title:'Interactive Playground',
+render(){return header('15','Interactive Playground',
+  'Turn the knobs — watch shapes, head dims, and parameter counts update live',
+  'Drag the sliders to set sequence length, model dimension, number of heads, vocabulary, and depth. Every tensor shape and the total parameter count recompute instantly, so you can build intuition for how each hyperparameter scales the model.')
++ step('intuition',`
+<p>Hyperparameters are not arbitrary. <code>d</code> must divide evenly by the number of heads. Sequence length drives the <em>quadratic</em> attention cost. Depth and width trade off in interesting ways. Play here until the relationships feel obvious.</p>`)
++ step('visual',`
+<div class="controls">
+  <div class="control"><label>sequence length n</label><input type="range" id="pgN" min="1" max="64" step="1" value="8"><span class="val" id="pgNV">8</span></div>
+  <div class="control"><label>model dim d</label><input type="range" id="pgD" min="8" max="512" step="8" value="64"><span class="val" id="pgDV">64</span></div>
+  <div class="control"><label>heads h</label><input type="range" id="pgH" min="1" max="16" step="1" value="4"><span class="val" id="pgHV">4</span></div>
+  <div class="control"><label>vocab V</label><input type="range" id="pgV" min="8" max="50000" step="8" value="1024"><span class="val" id="pgVV">1024</span></div>
+  <div class="control"><label>layers N</label><input type="range" id="pgL" min="1" max="48" step="1" value="6"><span class="val" id="pgLV">6</span></div>
+  <div class="control"><label>batch B</label><input type="range" id="pgB" min="1" max="64" step="1" value="2"><span class="val" id="pgBV">2</span></div>
+</div>
+<div id="pgWarn"></div>
+<p style="font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:6px">live tensor shapes</p>
+<div class="shape-flow" id="pgShapes"></div>
+<div class="canvas-wrap"><canvas id="pgCanvas" width="900" height="120"></canvas></div>
+<div class="block-detail" id="pgParams"></div>`)
++ step('math',`
+<p>Per-head dimension <code>d<sub>k</sub> = d / h</code> (must be an integer). Attention score memory grows as <code>O(B·h·n²)</code> — the famous quadratic-in-sequence-length cost that motivates Flash Attention and friends (next section). Parameters per block ≈ <code>4d²</code> (attention) + <code>8d²</code> (FFN) = <code>12d²</code>; total ≈ <code>N·12d² + V·d</code>.</p>`)
++ step('dims',`<p>The shapes panel above updates as you drag. Note how only <code>n</code> changes the attention grid size, while <code>d</code>, <code>h</code>, <code>N</code>, and <code>V</code> drive the parameter count.</p>`)
++ step('numeric',`<p>Try GPT-2 small: set d≈768 (slider caps at 512, but extrapolate), h=12, N=12, V≈50000. The parameter readout climbs past 100M — dominated by the embedding (V·d ≈ 38M) and the 12 blocks. Drop n and you will see attention memory shrink quadratically.</p>`)
++ step('code',`
+${codeBlock('build_from_config.py',
+`config = dict(vocab=1024, d=64, n_heads=4, n_layers=6, max_len=64)
+assert config['d'] % config['n_heads'] == 0, 'd must divide by heads'
+
+model = GPT(**config)
+n_params = sum(p.numel() for p in model.parameters())
+print(f'{n_params/1e6:.2f}M parameters')
+
+# attention score tensor for a batch:
+#   [B, n_heads, n, n]  -> memory grows with n**2`)}`)
++ step('quiz',quizBlock([
+  {q:'Which constraint must always hold between d and h?',
+   opts:['d must be larger than h','d must be divisible by h','h must be even','d must equal h'],a:1,
+   why:'d_k = d/h must be an integer, so d has to be divisible by the number of heads.'},
+  {q:'Doubling the sequence length n multiplies the attention score memory by about:',
+   opts:['2×','4×','the same','½×'],a:1,
+   why:'Attention scores scale as n², so doubling n roughly quadruples that memory/compute.'},
+  {q:'Which hyperparameter usually dominates parameter count in a large-vocab model?',
+   opts:['Sequence length','The embedding/output matrix (V·d)','Batch size','Number of heads'],a:1,
+   why:'With large V, the V·d embedding (and tied head) is a huge share of the parameters.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Choosing h that does not divide d. PyTorch will error or silently misshape; always check <code>d % h == 0</code>.</div>
+<div class="callout warn"><span class="h">Mistake</span>Ignoring the n² attention cost. Long contexts blow up memory fast — this is why efficient-attention methods exist.</div>
+<div class="callout warn"><span class="h">Mistake</span>Confusing depth (N) with width (d). They scale parameters and capacity differently; both matter.</div>`);
+},
+init(){
+  const ids=['N','D','H','V','L','B'];const el={};
+  ids.forEach(k=>{el[k]=document.getElementById('pg'+k);el[k+'v']=document.getElementById('pg'+k+'V');});
+  if(!el.N)return;
+  const cv=document.getElementById('pgCanvas');const ctx=cv.getContext('2d');
+  function fmt(x){return x>=1e6?(x/1e6).toFixed(2)+'M':x>=1e3?(x/1e3).toFixed(1)+'K':String(x);}
+  function update(){
+    const n=+el.N.value,d=+el.D.value,h=+el.H.value,V=+el.V.value,L=+el.L.value,B=+el.B.value;
+    ids.forEach(k=>el[k+'v'].textContent=el[k].value);
+    const ok=d%h===0;const d_k=Math.floor(d/h);
+    const warn=document.getElementById('pgWarn');
+    warn.innerHTML=ok?'':'<div class="callout warn"><span class="h">Invalid</span>d = '+d+' is not divisible by h = '+h+'. Pick heads that divide the model dim.</div>';
+    const shapes=[
+      ['input IDs','['+B+', '+n+']'],
+      ['embeddings','['+B+', '+n+', '+d+']'],
+      ['Q/K/V per head','['+B+', '+h+', '+n+', '+(ok?d_k:'?')+']'],
+      ['attention scores','['+B+', '+h+', '+n+', '+n+']'],
+      ['block output','['+B+', '+n+', '+d+']'],
+      ['logits','['+B+', '+n+', '+V+']']
+    ];
+    document.getElementById('pgShapes').innerHTML=shapes.map(s=>shapeRow(s[0],s[1])).join('');
+    // params
+    const perBlock=12*d*d + 4*d; // approx attn(4d^2)+ffn(8d^2) + small biases/LN
+    const emb=V*d + 64*d;
+    const total=L*perBlock + emb;
+    const scoreMem=B*h*n*n;
+    document.getElementById('pgParams').innerHTML=
+      '<b>≈ '+fmt(total)+' parameters</b> &nbsp; ('+fmt(L*perBlock)+' in blocks + '+fmt(emb)+' in embedding/head)<br>'+
+      'attention score tensor: <span style="font-family:var(--mono);color:var(--teal)">'+fmt(scoreMem)+'</span> values per forward &nbsp;·&nbsp; d_k = '+(ok?d_k:'invalid');
+    // bar viz of param split
+    ctx.clearRect(0,0,cv.width,cv.height);
+    const blocksP=L*perBlock, embP=emb, tot=blocksP+embP;
+    const bx=40,bw=cv.width-80,by=46,bh=34;
+    const wB=bw*blocksP/tot;
+    ctx.fillStyle='#f2a65a';ctx.beginPath();ctx.roundRect(bx,by,Math.max(2,wB),bh,7);ctx.fill();
+    ctx.fillStyle='#5eead4';ctx.beginPath();ctx.roundRect(bx+wB+3,by,Math.max(2,bw-wB-3),bh,7);ctx.fill();
+    ctx.fillStyle='#1a1206';ctx.font='11px ui-sans-serif';ctx.textAlign='left';
+    if(wB>70)ctx.fillText('blocks '+fmt(blocksP),bx+8,by+bh/2+4);
+    ctx.fillStyle='#06231f';if(bw-wB>70)ctx.fillText('embedding '+fmt(embP),bx+wB+11,by+bh/2+4);
+    ctx.fillStyle='#6f7382';ctx.font='11px ui-sans-serif';ctx.textAlign='left';
+    ctx.fillText('parameter split (amber = transformer blocks, teal = embedding + head)',bx,30);
+  }
+  ids.forEach(k=>el[k].oninput=update);
+  update();
+}
+});
+/* ===================== MODULE 16 ===================== */
+MODULES.push({
+id:'m16',num:'16',section:'Beyond',title:'Fine-Tuning LLMs',
+render(){return header('16','Fine-Tuning LLMs',
+  'Pretraining vs fine-tuning · SFT · chat templates · LoRA',
+  'Pretraining teaches a model language in general. Fine-tuning then adapts that general model to a specific task or behavior — turning a raw next-token predictor into a helpful assistant — usually with far less data and compute.')
++ step('intuition',`
+<p><strong>Pretraining</strong> is the expensive part: feed the model trillions of tokens of raw text so it learns grammar, facts, and reasoning patterns by predicting the next token. The result is a powerful but unfocused "base model" that just continues text.</p>
+<p><strong>Fine-tuning</strong> takes that base model and nudges it toward a goal: answering instructions, chatting politely, writing in a house style, or mastering a narrow domain. Because the model already knows language, fine-tuning needs orders of magnitude less data.</p>
+<div class="callout idea"><span class="h">Same machinery</span>Fine-tuning uses the <em>identical</em> next-token objective and training loop from Module 12. What changes is the <em>data</em> (curated examples) and often <em>which weights</em> we update.</div>
+<p><strong>Types of fine-tuning</strong> you will meet:</p>
+<ul>
+<li><strong>Supervised fine-tuning (SFT)</strong> — learn from prompt→response example pairs.</li>
+<li><strong>Instruction fine-tuning</strong> — SFT specifically on instruction-following data.</li>
+<li><strong>Chat fine-tuning</strong> — train on multi-turn conversations with role markers.</li>
+<li><strong>Domain fine-tuning</strong> — adapt to a field (legal, medical, code).</li>
+<li><strong>Parameter-efficient fine-tuning (PEFT)</strong> — update only a tiny set of new weights, e.g. LoRA.</li>
+</ul>`)
++ step('visual',`
+<p><strong>Supervised fine-tuning: loss only on the target.</strong> The prompt tokens are <em>conditioning</em> — the model reads them but is not graded on predicting them. Only the response tokens contribute to the loss. Toggle to see which tokens are masked out (label = −100).</p>
+<div class="btn-row"><button class="btn" id="ftMaskToggle">Show loss tokens ▸</button></div>
+<div class="canvas-wrap"><canvas id="ftMaskCanvas" width="900" height="150"></canvas></div>
+<p style="font-family:var(--mono);font-size:12px;color:var(--ink-faint)">example: <span style="color:var(--ink-dim)">"Translate to French: I love cats" → "J'aime les chats"</span></p>`)
++ step('math',`
+<p>Standard fine-tuning loss is the same cross-entropy, but summed <em>only</em> over response positions <code>R</code>:</p>
+<div class="eq">L <span class="op">=</span> <span class="frac"><span class="top">1</span><span class="bot">|R|</span></span> &nbsp;Σ<sub>t∈R</sub> −log p(y<sub>t</sub> | y<sub>&lt;t</sub>)</div>
+<p>Prompt positions are excluded by setting their label to the ignore index <code>−100</code>, which <code>F.cross_entropy</code> skips automatically.</p>
+<p>For <strong>LoRA</strong>, a frozen weight <code>W ∈ ℝ<sup>d×k</sup></code> gets a low-rank additive update:</p>
+<div class="eq">W' <span class="op">=</span> W <span class="op">+</span> <span class="v">B</span><span class="v">A</span>, &nbsp;&nbsp; <span class="v">B</span> ∈ ℝ<sup>d×r</sup>, &nbsp;<span class="v">A</span> ∈ ℝ<sup>r×k</sup>, &nbsp; r ≪ min(d,k)</div>
+<p>Only <code>A</code> and <code>B</code> are trained; <code>W</code> stays frozen. The update has rank at most <code>r</code>, so it adds only <code>r(d+k)</code> parameters instead of <code>d·k</code>.</p>`)
++ step('dims',`
+<p><strong>SFT batch.</strong> A tokenized prompt+response pair, with prompt labels masked to −100:</p>
+<div class="shape-flow">
+${shapeRow('input_ids (prompt+response)','[B, n]')}
+${shapeRow('labels (prompt = −100)','[B, n]')}
+${shapeRow('logits = model(input_ids)','[B, n, V]')}
+${shapeRow('cross_entropy (ignores −100)','scalar')}
+</div>
+<p><strong>LoRA shapes</strong> for one linear layer with <code>d=768, k=768, r=8</code>:</p>
+<div class="shape-flow">
+${shapeRow('frozen W','[768, 768]  (589,824 params, frozen)')}
+${shapeRow('A (trainable)','[8, 768]  (6,144 params)')}
+${shapeRow('B (trainable)','[768, 8]  (6,144 params)')}
+${shapeRow('trainable share','~12K vs 590K  ≈ 2%')}
+</div>`)
++ step('numeric',`
+<p>Take the pair <code>"Translate to French: I love cats"</code> → <code>"J'aime les chats"</code>. Suppose the prompt is 7 tokens and the response is 5 tokens, total n=12. The label tensor is <code>[−100,−100,−100,−100,−100,−100,−100, y₈, y₉, y₁₀, y₁₁, y₁₂]</code> — the first 7 are ignored, and loss is averaged over just the 5 response tokens. The model still <em>reads</em> all 12 tokens (so it conditions on the instruction), but it is only <em>graded</em> on generating the French.</p>`)
++ step('code',`
+<p><strong>Instruction & chat formatting.</strong> Raw pairs are wrapped in a chat template with role markers, then tokenized as one stream:</p>
+${codeBlock('chat_template.py',
+`# An instruction example:
+#   user:      "Explain self-attention simply."
+#   assistant: "Self-attention lets each token look at other tokens..."
+
+CHAT = "<|user|>\\n{q}\\n<|assistant|>\\n{a}<|end|>"
+
+def format_example(q, a):
+    return CHAT.format(q=q, a=a)
+
+text = format_example(
+    "Explain self-attention simply.",
+    "Self-attention lets each token look at other tokens and "
+    "decide which ones are relevant to its meaning.")
+# -> the special tokens tell the model who is speaking.
+# At inference you feed everything up to "<|assistant|>\\n"
+# and let the model generate the answer.`)}
+<p><strong>Supervised fine-tuning training step</strong> (loss masked to the response):</p>
+${codeBlock('finetune.py',
+`import torch, torch.nn.functional as F
+
+IGNORE = -100   # cross_entropy skips these positions
+
+def make_labels(prompt_ids, response_ids):
+    input_ids = prompt_ids + response_ids
+    labels    = [IGNORE] * len(prompt_ids) + response_ids[:]  # mask prompt
+    return torch.tensor(input_ids), torch.tensor(labels)
+
+model = GPT(**config)            # start from PRETRAINED weights
+opt = torch.optim.AdamW(model.parameters(), lr=2e-5)  # small LR!
+
+for batch in dataloader:         # batch: input_ids, labels  [B, n]
+    logits, _ = model(batch.input_ids)        # [B, n, V]
+    loss = F.cross_entropy(
+        logits.view(-1, logits.size(-1)),     # [B*n, V]
+        batch.labels.view(-1),                # [B*n]
+        ignore_index=IGNORE)                  # prompt tokens excluded
+    opt.zero_grad(); loss.backward(); opt.step()`)}
+<div class="explain-row">
+<div class="ln"><b>IGNORE = -100</b> — the sentinel label value <b>cross_entropy</b> ignores; how we "turn off" prompt tokens.</div>
+<div class="ln"><b>labels = [IGNORE]*len(prompt) + response</b> — only response positions get a real target.</div>
+<div class="ln"><b>lr = 2e-5</b> — fine-tuning uses a much smaller learning rate than pretraining to avoid wiping out knowledge.</div>
+<div class="ln"><b>ignore_index=IGNORE</b> — tells the loss to skip the masked prompt positions automatically.</div>
+</div>
+<p><strong>LoRA layer concept</strong> — wrap a frozen linear with a trainable low-rank adapter:</p>
+${codeBlock('lora.py',
+`import torch, torch.nn as nn
+
+class LoRALinear(nn.Module):
+    def __init__(self, in_features, out_features, rank=8, alpha=16):
+        super().__init__()
+        # the original pretrained weight, FROZEN
+        self.base = nn.Linear(in_features, out_features)
+        self.base.weight.requires_grad = False
+        self.base.bias.requires_grad = False
+        # small trainable matrices A and B
+        self.A = nn.Parameter(torch.randn(rank, in_features) * 0.01)
+        self.B = nn.Parameter(torch.zeros(out_features, rank))
+        self.scale = alpha / rank
+
+    def forward(self, x):                 # x: [..., in_features]
+        base_out = self.base(x)           # frozen path:  W x
+        lora_out = (x @ self.A.T) @ self.B.T   # low-rank path: B A x
+        return base_out + self.scale * lora_out`)}
+<div class="explain-row">
+<div class="ln"><b>self.base.weight.requires_grad = False</b> — freeze the pretrained weight; no gradients flow to it.</div>
+<div class="ln"><b>self.A = randn(rank, in)*0.01</b>, <b>self.B = zeros(out, rank)</b> — B starts at zero so the adapter initially adds nothing (training begins exactly at the base model).</div>
+<div class="ln"><b>(x @ A.T) @ B.T</b> — the cheap low-rank update BAx, computed without ever forming the full d×k matrix.</div>
+<div class="ln"><b>base_out + scale·lora_out</b> — frozen output plus the learned correction; only A and B are optimized.</div>
+</div>`)
++ step('quiz',quizBlock([
+  {q:'In supervised fine-tuning, which tokens contribute to the loss?',
+   opts:['All tokens','Only the prompt tokens','Only the response/target tokens','A random subset'],a:2,
+   why:'Prompt tokens are masked (label −100); the model is graded only on generating the response.'},
+  {q:'What value masks a token from the cross-entropy loss in PyTorch?',
+   opts:['0','-1','-100','None'],a:2,
+   why:'F.cross_entropy(..., ignore_index=-100) skips positions whose label is −100.'},
+  {q:'In LoRA W\' = W + BA, what is trained?',
+   opts:['W only','A and B only, W is frozen','All of W, A, B','Nothing'],a:1,
+   why:'The base weight W stays frozen; only the small low-rank matrices A and B are updated.'},
+  {q:'Why is B initialized to zeros in LoRA?',
+   opts:['To save memory','So the adapter contributes nothing at the start (output = base model)','It is required by the math','To freeze it'],a:1,
+   why:'With B=0, BA=0, so training begins exactly at the pretrained model and the adapter learns from there.'},
+  {q:'Compared to pretraining, fine-tuning typically uses a learning rate that is:',
+   opts:['Much larger','About the same','Much smaller','Zero'],a:2,
+   why:'A small LR (e.g. 1e-5–3e-5) adapts the model without catastrophically overwriting pretrained knowledge.'}
+]))
++ step('mistakes',`
+<div class="callout warn"><span class="h">Mistake</span>Computing loss on prompt tokens. Forgetting to mask the prompt (−100) teaches the model to parrot instructions instead of answering them.</div>
+<div class="callout warn"><span class="h">Mistake</span>Forgetting the chat template. If training data uses role markers but inference does not (or vice versa), the model behaves erratically.</div>
+<div class="callout warn"><span class="h">Mistake</span>Learning rate too high. Large LRs cause "catastrophic forgetting" — the model loses its pretrained abilities.</div>
+<div class="callout warn"><span class="h">Mistake</span>Overfitting a tiny dataset. With few examples the model memorizes them; use fewer epochs, regularization, or LoRA.</div>
+<div class="callout warn"><span class="h">Mistake</span>Training on bad data. Fine-tuning faithfully copies your data's style and errors — quality matters more than quantity.</div>
+<div class="callout warn"><span class="h">Mistake</span>Confusing pretraining with fine-tuning. Pretraining builds general ability from scratch; fine-tuning adapts an existing model.</div>
+<div class="callout warn"><span class="h">Mistake</span>Thinking LoRA changes the base weights. It does not — W is frozen; LoRA stores a separate small adapter you can add, swap, or remove.</div>`);
+},
+init(){
+  // ---- SFT loss-mask visualization ----
+  const cv=document.getElementById('ftMaskCanvas');if(!cv)return;const ctx=cv.getContext('2d');
+  const toks=[
+    {t:'Translate',p:true},{t:'to',p:true},{t:'French',p:true},{t:':',p:true},
+    {t:'I',p:true},{t:'love',p:true},{t:'cats',p:true},
+    {t:"J'",p:false},{t:'aime',p:false},{t:'les',p:false},{t:'chats',p:false}
+  ];
+  let show=false;
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    const n=toks.length,gap=8,w=(cv.width-40-gap*(n-1))/n,y=46,h=44;
+    toks.forEach((tk,i)=>{
+      const x=20+i*(w+gap);
+      const isLoss=show&&!tk.p;
+      ctx.fillStyle=tk.p?'#161d2c':(show?'#241c10':'#15212a');
+      ctx.strokeStyle=isLoss?'#f2a65a':(tk.p?'#39415a':'#5eead4');ctx.lineWidth=isLoss?2.5:1.5;
+      ctx.beginPath();ctx.roundRect(x,y,w,h,8);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#e7e3d8';ctx.font='12px ui-monospace,monospace';ctx.textAlign='center';
+      ctx.fillText(tk.t,x+w/2,y+h/2+2);
+      // label row
+      ctx.font='9.5px ui-monospace,monospace';
+      if(show){
+        ctx.fillStyle=tk.p?'#6f7382':'#f2a65a';
+        ctx.fillText(tk.p?'-100':'loss',x+w/2,y+h+16);
+      }
+    });
+    ctx.fillStyle='#6f7382';ctx.font='11px ui-sans-serif';ctx.textAlign='left';
+    ctx.fillText('blue = prompt (conditioning)   teal = response',20,28);
+    if(show){ctx.fillStyle='#f2a65a';ctx.textAlign='right';ctx.fillText('amber outline = contributes to loss',cv.width-20,28);}
+  }
+  draw();
+  document.getElementById('ftMaskToggle').onclick=function(){show=!show;this.textContent=show?'Hide loss tokens ◂':'Show loss tokens ▸';draw();};
+}
+});
+
+/* ===================== FINAL: ROADMAP ===================== */
+MODULES.push({
+id:'road',num:'★',section:'Beyond',title:'Build-GPT Roadmap',
+render(){return header('★','Build GPT From Scratch — The Roadmap',
+  'Eight stages from raw text to production-grade LLM engineering',
+  'A map of the whole journey. The first seven stages are everything this course covered; the eighth points to the modern engineering techniques that make large models fast and cheap to serve. Press Animate to light the path.')
++ `<div class="btn-row"><button class="btn" id="rdPlay">▶ Animate path</button><button class="btn ghost" id="rdReset">Reset</button></div>`
++ `<div class="roadmap" id="roadmap">
+${roadStage('1','Tokenization','Text → tokens → integer IDs. The vocabulary defines the model\'s alphabet.','Module 1')}
+${roadStage('2','Embeddings','IDs → dense vectors, plus positional information so order is preserved.','Modules 2–3')}
+${roadStage('3','Attention','Self-attention (Q,K,V), scaling, softmax, causal masking, multiple heads.','Modules 4–6')}
+${roadStage('4','Transformer Block','LayerNorm, residuals, and the feed-forward network assembled into one repeatable unit.','Modules 7–10')}
+${roadStage('5','GPT Architecture','Embed → N blocks → final norm → output projection → next-token distribution.','Module 11')}
+${roadStage('6','Training','Cross-entropy on next tokens, backprop, AdamW, gradient clipping.','Modules 12–13')}
+${roadStage('7','Inference','Autoregressive generation: predict, sample, append, repeat — with temperature/top-k.','Modules 13–15')}
+${roadStage('8','Modern LLM Engineering','Making big models fast and affordable to serve at scale. The techniques below live here.','beyond')}
+</div>`
++ `<h2 class="step visual" style="margin-top:30px"><span class="badge">Stage 8</span>Modern LLM Engineering — click a card</h2>
+<p>These are the production techniques you graduate into after the fundamentals. Click any card for the one-paragraph intuition.</p>
+<div class="tag-grid" id="rdTags"></div>
+<div class="block-detail" id="rdTagDetail">Click a technique above to read what it does and why it matters.</div>`
++ `<div class="callout idea" style="margin-top:26px"><span class="h">You made it</span>You now understand a GPT end to end — from a string of text to a trained, sampling language model, and where the field goes next. The best next step is to <em>build one</em>: type out the code from Module 13 and train it on a small text file.</div>`;
+},
+init(){
+  // roadmap animation
+  const stages=Array.from(document.querySelectorAll('#roadmap .stage'));
+  let raf=null;
+  function reset(){stages.forEach(s=>s.classList.remove('lit'));}
+  document.getElementById('rdPlay').onclick=()=>{
+    reset();let i=0;cancelAnimationFrame(raf);let last=0;
+    (function loop(ts){if(!last)last=ts;if(ts-last>360){if(i<stages.length){stages[i].classList.add('lit');i++;last=ts;}}if(i<stages.length)raf=requestAnimationFrame(loop);})(0);
+  };
+  document.getElementById('rdReset').onclick=()=>{cancelAnimationFrame(raf);reset();};
+  // technique cards
+  const techs=[
+    {t:'KV Cache',d:'During generation, the keys and values of past tokens never change. The KV cache stores them so each new token only computes attention against cached K/V instead of recomputing the whole sequence — turning O(n²) per-step work into O(n).'},
+    {t:'Flash Attention',d:'A memory-efficient exact attention algorithm. It computes softmax(QKᵀ)V in tiles that stay in fast on-chip SRAM, never materializing the full n×n score matrix in slow GPU memory — big speedups and far less memory for long sequences.'},
+    {t:'MQA',d:'Multi-Query Attention: all query heads share a single key/value head. This shrinks the KV cache dramatically (one K and V instead of h of them), speeding up inference at a small quality cost.'},
+    {t:'GQA',d:'Grouped-Query Attention: a middle ground between full multi-head and MQA. Heads are split into a few groups that each share K/V. Used by models like Llama 2/3 to balance speed and quality.'},
+    {t:'MoE',d:'Mixture of Experts: replace the dense FFN with many expert FFNs and a router that activates only a few per token. You get a huge parameter count but a small per-token compute cost — more capacity, similar speed.'},
+    {t:'Quantization',d:'Store weights (and sometimes activations) in low precision — int8, int4 — instead of 16/32-bit floats. Cuts memory and bandwidth several-fold so large models fit on smaller hardware, with minimal accuracy loss.'},
+    {t:'vLLM',d:'A high-throughput serving engine. Its PagedAttention manages the KV cache like virtual memory (in pages), eliminating fragmentation and enabling continuous batching of many requests — dramatically higher throughput.'}
+  ];
+  const grid=document.getElementById('rdTags');const det=document.getElementById('rdTagDetail');
+  techs.forEach(tc=>{
+    const c=document.createElement('div');c.className='tag-card';
+    c.innerHTML='<div class="t">'+tc.t+'</div>';
+    c.style.cursor='pointer';
+    c.onclick=()=>{det.innerHTML='<b>'+tc.t+'</b> &mdash; '+tc.d;
+      grid.querySelectorAll('.tag-card').forEach(x=>x.style.borderColor='');c.style.borderColor='var(--amber)';};
+    grid.appendChild(c);
+  });
+}
+});
+
+/* helper for roadmap stage markup (defined after use is fine: hoisted) */
+function roadStage(num,title,desc,tag){
+  return `<div class="stage"><div class="bullet">${num}</div><div class="stem"></div>
+    <div class="body"><h4>${title} <span class="shape-pill">${tag}</span></h4><p>${desc}</p></div></div>`;
+}
+
+</script>
+<script>buildNav();go(0);</script>
+</body>
+</html>
